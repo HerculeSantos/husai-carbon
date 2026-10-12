@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HUSAI CARBON | Inteligência em Ativos Florestais</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1b4332;
+            --primary-light: #2d6a4f;
+            --accent: #d8f3dc;
+            --gold: #b7791f;
+            --dark: #081c15;
+            --bg: #f8f9fa;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background: var(--bg); color: #212529; }
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1.2rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--primary-light);
+        }
+        .logo { font-size: 1.4rem; font-weight: 800; }
+        .logo span { color: #52b788; }
+        .badge-gov {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 0.35rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .container { max-width: 860px; margin: 2.5rem auto; padding: 0 1.5rem; }
+        .hero { text-align: center; margin-bottom: 2.5rem; }
+        .hero h1 { font-size: 2.2rem; color: var(--dark); font-weight: 800; line-height: 1.25; margin-bottom: 0.8rem; }
+        .hero p { font-size: 1.05rem; color: #495057; max-width: 650px; margin: 0 auto; }
+        .search-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+            border: 1px solid #e9ecef;
+        }
+        .search-box { display: flex; gap: 0.8rem; margin-top: 1rem; }
+        .search-box input {
+            flex: 1;
+            padding: 1rem 1.2rem;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .btn-consultar {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 1.8rem;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-consultar:hover { background: var(--primary-light); }
+        .preview-card {
+            display: none;
+            margin-top: 2rem;
+            background: white;
+            border-radius: 12px;
+            border: 2px solid #52b788;
+            box-shadow: 0 12px 30px rgba(45, 106, 79, 0.12);
+            overflow: hidden;
+        }
+        .preview-header {
+            background: var(--accent);
+            padding: 1.2rem 1.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .preview-body { padding: 2rem; text-align: center; }
+        .callout-money {
+            background: #fef9e7;
+            border: 2px dashed var(--gold);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+        }
+        .callout-money h2 { font-size: 2.4rem; color: #b7791f; font-weight: 800; margin: 0.4rem 0; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; text-align: left; }
+        .stat-item { background: #f8f9fa; padding: 1rem; border-radius: 8px; border: 1px solid #e9ecef; }
+        .stat-item strong { display: block; font-size: 1.1rem; color: var(--dark); margin-top: 0.3rem; }
+        .btn-desbloquear {
+            background: #2d6a4f;
+            color: white;
+            padding: 1.1rem 2.2rem;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+        .btn-desbloquear:hover { background: #1b4332; }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+        }
+        .modal-content {
+            background: white;
+            max-width: 480px;
+            width: 100%;
+            border-radius: 14px;
+            padding: 2rem;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            top: 1rem; right: 1.2rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #6c757d;
+        }
+        .form-group { margin-bottom: 1rem; text-align: left; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #495057; margin-bottom: 0.3rem; }
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .cupom-box { display: flex; gap: 0.5rem; }
+        .btn-aplicar {
+            background: #495057;
+            color: white;
+            border: none;
+            padding: 0 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-pix {
+            width: 100%;
+            background: #00b4d8;
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        .pix-display {
+            display: none;
+            background: #e0f2fe;
+            border: 1px solid #bae6fd;
+            padding: 1.2rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            text-align: left;
+        }
+        .pix-code {
+            background: white;
+            padding: 0.7rem;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-family: monospace;
+            word-break: break-all;
+            margin: 0.5rem 0;
+            font-size: 0.75rem;
+            user-select: all;
+        }
+        .btn-copiar-pix {
+            width: 100%;
+            background: #0284c7;
+            color: white;
+            border: none;
+            padding: 0.65rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 0.8rem;
+            transition: background 0.2s;
+        }
+        .btn-baixar-pronto {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">HUSAI <span>CARBON</span></div>
+        <div class="badge-gov">Ambiente Homologado | Mato Grosso</div>
+    </header>
+
+    <div class="container">
+        <div class="hero">
+            <h1>Descubra quanto a sua Reserva Legal e APP podem gerar em Ativos</h1>
+            <p>Auditoria geoespacial instantânea de conformidade e cálculo de elegibilidade para CPR Verde e estatal CMAA-MT.</p>
+        </div>
+
+        <div class="search-card">
+            <label style="font-size: 0.9rem; font-weight: 600; color: #495057;">CÓDIGO OFICIAL DO CAR (SICAR-MT)</label>
+            <div class="search-box">
+                <input type="text" id="carInput" value="MT-5104557-00982341">
+                <button class="btn-consultar" onclick="consultarCAR()">Auditar Imóvel</button>
+            </div>
+        </div>
+
+        <div class="preview-card" id="previewBox">
+            <div class="preview-header">
+                <h3>Fazenda Auditada | Médio-Norte MT</h3>
+                <span style="font-size: 0.8rem; font-weight: 700; color: #2d6a4f;">STATUS: APTO</span>
+            </div>
+            <div class="preview-body">
+                <div class="callout-money">
+                    <p style="font-size: 0.85rem; color: #744210; font-weight: 600;">Potencial Económico Estimado</p>
+                    <h2>R$ 481.250,00</h2>
+                    <span style="font-size: 0.85rem; color: #8c5310;">Projeção para ciclo de 5 anos em CPR Verde ou Créditos de Carbono</span>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item"><small style="color:#6c757d; font-size:0.75rem;">ÁREA TOTAL</small><strong>2.500,00 ha</strong></div>
+                    <div class="stat-item"><small style="color:#6c757d; font-size:0.75rem;">ÁREA PRESERVADA</small><strong>875,00 ha</strong></div>
+                    <div class="stat-item"><small style="color:#6c757d; font-size:0.75rem;">ESTOQUE DE CARBONO</small><strong>1.750 tCO2e/ano</strong></div>
+                </div>
+                <button class="btn-desbloquear" onclick="abrirModal()">
+                    🔒 Desbloquear Dossiê Técnico Completo (PDF)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalCheckout">
+        <div class="modal-content">
+            <button class="modal-close" onclick="fecharModal()">&times;</button>
+            <h2 style="font-size: 1.3rem; color: var(--primary); margin-bottom: 0.4rem;">Emissão do Dossiê Técnico</h2>
+            <p style="font-size: 0.85rem; color: #6c757d; margin-bottom: 1.2rem;">Preencha os dados para emissão do laudo oficial com QR Code.</p>
+
+            <div class="form-group">
+                <label>Nome Completo ou Razão Social</label>
+                <input type="text" id="inputNome" placeholder="Ex: Agropecuária Santa Maria">
+            </div>
+            <div class="form-group">
+                <label>E-mail para Envio do Dossiê</label>
+                <input type="email" id="inputEmail" placeholder="Ex: contato@fazenda.com.br">
+            </div>
+            <div class="form-group">
+                <label>WhatsApp para Notificações</label>
+                <input type="text" id="inputWhats" placeholder="Ex: (66) 99988-7766">
+            </div>
+            <div class="form-group">
+                <label>Cupão de Acesso</label>
+                <div class="cupom-box">
+                    <input type="text" id="inputCupom" placeholder="Ex: PIONEIRO-MT" style="text-transform: uppercase;">
+                    <button class="btn-aplicar" onclick="validarCupom()">Aplicar</button>
+                </div>
+                <small id="cupomMsg" style="display:none; font-size:0.75rem; margin-top:0.3rem; font-weight:600;"></small>
+            </div>
+
+            <div id="blocoPagamento">
+                <button class="btn-pix" onclick="gerarPix()">📱 Pagar via PIX (R$ 350,00)</button>
+            </div>
+
+            <div class="pix-display" id="blocoPixDisplay">
+                <b style="font-size:0.85rem;">Chave PIX Copia e Cola:</b>
+                <div class="pix-code" id="codigoPixTexto">00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD</div>
+                
+                <button class="btn-copiar-pix" id="btnCopiar" onclick="copiarCodigoPix()">
+                    📋 Copiar Código PIX
+                </button>
+                
+                <button class="btn-baixar-pronto" onclick="concluirBaixar('PIX')">
+                    ✅ Confirmar Pagamento e Baixar Dossiê
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function consultarCAR() {
+            document.getElementById('previewBox').style.display = 'block';
+        }
+
+        function abrirModal() {
+            document.getElementById('modalCheckout').style.display = 'flex';
+        }
+
+        function fecharModal() {
+            document.getElementById('modalCheckout').style.display = 'none';
+        }
+
+        function validarCupom() {
+            const cupom = document.getElementById('inputCupom').value.trim().toUpperCase();
+            const msg = document.getElementById('cupomMsg');
+            const blocoPag = document.getElementById('blocoPagamento');
+
+            if(cupom === "PIONEIRO-MT") {
+                msg.style.display = 'block';
+                msg.style.color = '#2e7d32';
+                msg.innerText = "✓ Cupão Pioneiro aplicado! Desconto de 100%.";
+                blocoPag.innerHTML = `
+                    <button class="btn-baixar-pronto" onclick="concluirBaixar('CUPOM-PIONEIRO')">
+                        🚀 Baixar Dossiê Imediatamente (Grátis)
+                    </button>
+                `;
+            } else {
+                msg.style.display = 'block';
+                msg.style.color = '#c62828';
+                msg.innerText = "✗ Cupão inválido.";
+            }
+        }
+
+        function gerarPix() {
+            const nome = document.getElementById('inputNome').value.trim();
+            const email = document.getElementById('inputEmail').value.trim();
+            const whats = document.getElementById('inputWhats').value.trim();
+            if(!nome || !email || !whats) {
+                alert("Preencha Nome, E-mail e WhatsApp antes de prosseguir.");
+                return;
+            }
+            document.getElementById('blocoPagamento').style.display = 'none';
+            document.getElementById('blocoPixDisplay').style.display = 'block';
+        }
+
+        function copiarCodigoPix() {
+            const codigo = document.getElementById('codigoPixTexto').innerText.trim();
+            navigator.clipboard.writeText(codigo).then(() => {
+                const btn = document.getElementById('btnCopiar');
+                btn.style.background = '#2d6a4f';
+                btn.innerText = '✓ Código Copiado!';
+                setTimeout(() => {
+                    btn.style.background = '#0284c7';
+                    btn.innerText = '📋 Copiar Código PIX';
+                }, 2500);
+            });
+        }
+
+        async function concluirBaixar(tipoMetodo = "PIX") {
+            const nome = document.getElementById('inputNome').value.trim();
+            const email = document.getElementById('inputEmail').value.trim();
+            const whats = document.getElementById('inputWhats').value.trim();
+            const car = document.getElementById('carInput').value.trim();
+
+            try {
+                await fetch("/api/salvar-lead", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        nome: nome || "Produtor Teste",
+                        email: email || "teste@husai.com",
+                        whatsapp: whats || "00000000",
+                        codigo_car: car || "MT-PADRAO",
+                        metodo: tipoMetodo
+                    })
+                });
+            } catch (e) {
+                console.error("Erro ao guardar registo:", e);
+            }
+
+            window.location.href = "/api/download-laudo";
+            setTimeout(() => { fecharModal(); }, 1000);
+        }
+    </script>
+</body>
+</html>
