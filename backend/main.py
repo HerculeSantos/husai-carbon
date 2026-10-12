@@ -1,12 +1,32 @@
 import os
+import io
+import csv
 import sqlite3
+import secrets
 from datetime import datetime
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from backend.modules.gerar_laudo import emitir_laudo_husai_completo
 
 app = FastAPI(title="Husai Carbon API")
+security = HTTPBasic()
+
+# Credenciais de acesso ao Painel Admin
+ADMIN_USER = "admin"
+ADMIN_PASS = "husai2026"
+
+def verificar_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    user_correto = secrets.compare_digest(credentials.username, ADMIN_USER)
+    pass_correta = secrets.compare_digest(credentials.password, ADMIN_PASS)
+    if not (user_correto and pass_correta):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Acesso não autorizado",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # Inicialização da base de dados local SQLite
 DB_PATH = "leads_husai.db"
@@ -57,32 +77,40 @@ def salvar_lead(lead: LeadModel):
     return {"status": "sucesso", "mensagem": "Lead registada com sucesso"}
 
 @app.get("/api/download-laudo")
-def download_laudo():
-    caminho_pdf = "laudo_executivo_husai.pdf"
-    
-    if not os.path.exists(caminho_pdf):
-        dados_exemplo = {
-            "codigo_car": "MT-5104557-00982341",
-            "coordenadas_ref": "-12.5641,-55.7215;-12.5890,-55.7001",
-            "area_total_ha": 2500.0,
-            "area_consolidada_ha": 1625.0,
-            "reserva_legal_ha": 750.0,
-            "app_ha": 125.0,
-            "excedente_ha": 125.0,
-            "area_preservada_ha": 875.0,
-            "tco2_ano": 1750.0,
-            "valor_anual_brl": 96250.00,
-            "valor_ciclo_5_anos_brl": 481250.00
-        }
-        dados_consultor = {
-            "nome": "AgroSustentável Consultoria Ambiental",
-            "registro": "CREA-MT 12345/D"
-        }
-        emitir_laudo_husai_completo(dados_exemplo, dados_consultor, caminho_pdf)
+def download_laudo(
+    car: str = Query("MT-5104557-00982341"),
+    nome: str = Query("Produtor Rural"),
+    email: str = Query("contato@fazenda.com.br")
+):
+    nome_limpo_car = car.replace("/", "_").replace("-", "_").replace(" ", "_")
+    nome_arquivo_pdf = f"laudo_{nome_limpo_car}.pdf"
+    caminho_pdf = os.path.join(".", nome_arquivo_pdf)
+
+    dados_imovel = {
+        "codigo_car": car,
+        "proprietario": nome,
+        "contato": email,
+        "coordenadas_ref": "-12.5641,-55.7215;-12.5890,-55.7001",
+        "area_total_ha": 2500.0,
+        "area_consolidada_ha": 1625.0,
+        "reserva_legal_ha": 750.0,
+        "app_ha": 125.0,
+        "excedente_ha": 125.0,
+        "area_preservada_ha": 875.0,
+        "tco2_ano": 1750.0,
+        "valor_anual_brl": 96250.00,
+        "valor_ciclo_5_anos_brl": 481250.00
+    }
+    dados_consultor = {
+        "nome": "Husai Carbon Soluções Ambientais",
+        "registro": "CREA-MT 12345/D"
+    }
+
+    emitir_laudo_husai_completo(dados_imovel, dados_consultor, caminho_pdf)
 
     return FileResponse(
         path=caminho_pdf,
-        filename="Dossie_Husai_Carbon.pdf",
+        filename=f"Dossie_Husai_{car}.pdf",
         media_type="application/pdf"
     )
 
@@ -92,12 +120,9 @@ def validar_dossie(codigo: str):
     with open(caminho_html, "r", encoding="utf-8") as f:
         conteudo = f.read()
     return conteudo.replace("{{CODIGO}}", codigo)
-import io
-import csv
-from fastapi.responses import Response
 
 @app.get("/admin", response_class=HTMLResponse)
-def painel_admin():
+def painel_admin(username: str = Depends(verificar_admin)):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, nome, email, whatsapp, codigo_car, metodo, criado_em FROM leads ORDER BY id DESC")
@@ -131,9 +156,9 @@ def painel_admin():
             .topo {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }}
             h1 {{ color: #1b4332; font-size: 1.5rem; margin-bottom: 0.3rem; }}
             p {{ color: #666; font-size: 0.9rem; margin: 0; }}
-            .btn-csv {{ background: #2d6a4f; color: white; text-decoration: none; padding: 0.7rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem; }}
+            .btn-csv {{ background: #2d6a4f; color: white; text-decoration: none; padding: 0.7rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }}
             .btn-csv:hover {{ background: #1b4332; }}
-            table {{ width: 100%; border-collapse: collapse; text-align: left; }}
+            table {{ width: 100%; border-collapse: collapse; text-align: left; margin-top: 1rem; }}
             th {{ background: #1b4332; color: white; padding: 10px; font-size: 13px; text-transform: uppercase; }}
         </style>
     </head>
@@ -166,8 +191,9 @@ def painel_admin():
     </body>
     </html>
     """
+
 @app.get("/admin/exportar-csv")
-def exportar_csv():
+def exportar_csv(username: str = Depends(verificar_admin)):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, nome, email, whatsapp, codigo_car, metodo, criado_em FROM leads ORDER BY id DESC")
@@ -177,11 +203,10 @@ def exportar_csv():
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["ID", "Nome / Razao", "E-mail", "WhatsApp", "Codigo CAR", "Metodo", "Data Cadastro"])
-    
+
     for r in linhas:
         writer.writerow(r)
 
-    # utf-8-sig para abrir com acentuação correta no Excel brasileiro
     conteudo_csv = output.getvalue().encode("utf-8-sig")
     return Response(
         content=conteudo_csv,

@@ -360,20 +360,20 @@
         }
 
         async function concluirBaixar(tipoMetodo = "PIX") {
-            const nome = document.getElementById('inputNome').value.trim();
-            const email = document.getElementById('inputEmail').value.trim();
-            const whats = document.getElementById('inputWhats').value.trim();
-            const car = document.getElementById('carInput').value.trim();
+            const nome = document.getElementById('inputNome').value.trim() || "Produtor Rural";
+            const email = document.getElementById('inputEmail').value.trim() || "contato@fazenda.com.br";
+            const whats = document.getElementById('inputWhats').value.trim() || "00000000";
+            const car = document.getElementById('carInput').value.trim() || "MT-PADRAO";
 
             try {
                 await fetch("/api/salvar-lead", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        nome: nome || "Produtor Teste",
-                        email: email || "teste@husai.com",
-                        whatsapp: whats || "00000000",
-                        codigo_car: car || "MT-PADRAO",
+                        nome: nome,
+                        email: email,
+                        whatsapp: whats,
+                        codigo_car: car,
                         metodo: tipoMetodo
                     })
                 });
@@ -381,8 +381,11 @@
                 console.error("Erro ao guardar registo:", e);
             }
 
-            window.location.href = "/api/download-laudo";
-            setTimeout(() => { fecharModal(); }, 1000);
+            // Envia os dados dinâmicos pela URL para gerar o PDF personalizado
+            const urlDownload = `/api/download-laudo?car=${encodeURIComponent(car)}&nome=${encodeURIComponent(nome)}&email=${encodeURIComponent(email)}`;
+            window.location.href = urlDownload;
+
+            setTimeout(() => { fecharModal(); }, 1200);
         }
     </script>
 </body>
