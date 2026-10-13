@@ -258,7 +258,7 @@
             <label style="font-size: 0.82rem; font-weight: 700; color: #475569;">CÓDIGO OFICIAL DO CAR (SICAR-MT)</label>
             <div class="search-box">
                 <input type="text" id="carInput" value="MT-5104557-00982341">
-                <button class="btn-consultar" onclick="consultarCAR()">Auditar Imóvel</button>
+                <button type="button" class="btn-consultar" id="btnConsultarCar" onclick="consultarCAR()">Auditar Imóvel</button>
             </div>
         </div>
 
@@ -269,7 +269,7 @@
             </div>
             <div class="preview-body">
                 <div class="callout-money">
-                    <p style="font-size: 0.8rem; color: #78350f; font-weight: 600;">Potencial Económico Estimado</p>
+                    <p style="font-size: 0.8rem; color: #78350f; font-weight: 600;">Potencial Econômico Estimado</p>
                     <h2>R$ 481.250,00</h2>
                     <span style="font-size: 0.78rem; color: #92400e;">Projeção para ciclo de 5 anos em CPR Verde ou Créditos de Carbono</span>
                 </div>
@@ -278,7 +278,7 @@
                     <div class="stat-item"><small>ÁREA PRESERVADA</small><strong>875,00 ha</strong></div>
                     <div class="stat-item"><small>ESTOQUE ESTIMADO</small><strong>1.750 tCO2e/ano</strong></div>
                 </div>
-                <button class="btn-desbloquear" onclick="abrirModal()">
+                <button type="button" class="btn-desbloquear" onclick="abrirModal()">
                     🔒 Desbloquear Dossiê Técnico Completo (PDF)
                 </button>
             </div>
@@ -287,13 +287,17 @@
 
     <div class="modal-overlay" id="modalCheckout">
         <div class="modal-content">
-            <button class="modal-close" onclick="fecharModal()">&times;</button>
+            <button type="button" class="modal-close" onclick="fecharModal()">&times;</button>
             <h2 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.3rem;">Emissão do Dossiê Técnico</h2>
-            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;">Preencha os dados do imóvel e titular para o laudo com assinatura digital.</p>
+            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;">Preencha os dados do titular para emissão do laudo com validação criptográfica.</p>
 
             <div class="form-group">
                 <label>Nome Completo ou Razão Social</label>
-                <input type="text" id="inputNome" placeholder="Ex: Agropecuária Fazenda Nova">
+                <input type="text" id="inputNome" placeholder="Ex: Agropecuária Nova Fronteira LTDA">
+            </div>
+            <div class="form-group">
+                <label>CPF ou CNPJ do Titular</label>
+                <input type="text" id="inputDoc" placeholder="Ex: 00.000.000/0001-00 ou CPF">
             </div>
             <div class="form-group">
                 <label>E-mail para Envio do Dossiê</label>
@@ -304,28 +308,28 @@
                 <input type="tel" id="inputWhats" placeholder="Ex: (66) 99988-7766">
             </div>
             <div class="form-group">
-                <label>Cupão de Acesso</label>
+                <label>Cupom de Acesso</label>
                 <div class="cupom-box">
                     <input type="text" id="inputCupom" placeholder="Ex: PIONEIRO-MT" style="text-transform: uppercase;">
-                    <button class="btn-aplicar" onclick="validarCupom()">Aplicar</button>
+                    <button type="button" class="btn-aplicar" onclick="validarCupom()">Aplicar</button>
                 </div>
                 <small id="cupomMsg" style="display:none; font-size:0.75rem; margin-top:0.3rem; font-weight:600;"></small>
             </div>
 
             <div id="blocoPagamento">
-                <button class="btn-pix" id="btnDispararPix" onclick="gerarPix()">📱 Pagar via PIX (R$ 350,00)</button>
+                <button type="button" class="btn-pix" id="btnDispararPix" onclick="gerarPix()">📱 Pagar via PIX (R$ 350,00)</button>
             </div>
 
             <div class="pix-display" id="blocoPixDisplay">
                 <div id="qrCodeImgContainer" style="text-align:center; margin-bottom:10px;"></div>
                 <b style="font-size:0.8rem; color: #0369a1;">Chave PIX Copia e Cola:</b>
-                <div class="pix-code" id="codigoPixTexto">A carregar chave oficial...</div>
+                <div class="pix-code" id="codigoPixTexto">Gerando chave oficial...</div>
                 
-                <button class="btn-copiar-pix" id="btnCopiar" onclick="copiarCodigoPix()">
+                <button type="button" class="btn-copiar-pix" id="btnCopiar" onclick="copiarCodigoPix()">
                     📋 Copiar Código PIX
                 </button>
                 
-                <button class="btn-baixar-pronto" onclick="concluirBaixar('PIX')">
+                <button type="button" class="btn-baixar-pronto" onclick="concluirBaixar('PIX')">
                     ✅ Confirmar Pagamento e Baixar Dossiê
                 </button>
             </div>
@@ -334,70 +338,76 @@
 
     <script>
         function consultarCAR() {
-            const preview = document.getElementById('previewBox');
-            preview.style.display = 'block';
-            preview.scrollIntoView({ behavior: 'smooth' });
+            var preview = document.getElementById('previewBox');
+            if(preview) {
+                preview.style.display = 'block';
+                preview.scrollIntoView({ behavior: 'smooth' });
+            }
         }
 
         function abrirModal() {
-            document.getElementById('modalCheckout').style.display = 'flex';
+            var modal = document.getElementById('modalCheckout');
+            if(modal) modal.style.display = 'flex';
         }
 
         function fecharModal() {
-            document.getElementById('modalCheckout').style.display = 'none';
+            var modal = document.getElementById('modalCheckout');
+            if(modal) modal.style.display = 'none';
         }
 
         function validarCupom() {
-            const cupom = document.getElementById('inputCupom').value.trim().toUpperCase();
-            const msg = document.getElementById('cupomMsg');
-            const blocoPag = document.getElementById('blocoPagamento');
+            var cupom = document.getElementById('inputCupom').value.trim().toUpperCase();
+            var msg = document.getElementById('cupomMsg');
+            var blocoPag = document.getElementById('blocoPagamento');
 
             if(cupom === "PIONEIRO-MT") {
                 msg.style.display = 'block';
                 msg.style.color = '#16a34a';
-                msg.innerText = "✓ Cupão Pioneiro aplicado! Desconto integral de 100%.";
-                blocoPag.innerHTML = `
-                    <button class="btn-baixar-pronto" onclick="concluirBaixar('CUPOM-PIONEIRO')">
-                        🚀 Baixar Dossiê Imediatamente (Grátis)
-                    </button>
-                `;
+                msg.innerText = "✓ Cupom Pioneiro aplicado! Desconto integral de 100%.";
+                blocoPag.innerHTML = '<button type="button" class="btn-baixar-pronto" onclick="concluirBaixar(\'CUPOM-PIONEIRO\')">🚀 Baixar Dossiê Imediatamente (Grátis)</button>';
             } else {
                 msg.style.display = 'block';
                 msg.style.color = '#dc2626';
-                msg.innerText = "✗ Cupão inválido.";
+                msg.innerText = "✗ Cupom inválido.";
             }
         }
 
         async function gerarPix() {
-            const nome = document.getElementById('inputNome').value.trim();
-            const email = document.getElementById('inputEmail').value.trim();
-            const whats = document.getElementById('inputWhats').value.trim();
-            const car = document.getElementById('carInput').value.trim() || "MT-PADRAO";
+            var nome = document.getElementById('inputNome').value.trim();
+            var documento = document.getElementById('inputDoc').value.trim();
+            var email = document.getElementById('inputEmail').value.trim();
+            var whats = document.getElementById('inputWhats').value.trim();
+            var car = document.getElementById('carInput').value.trim() || "MT-PADRAO";
 
             if(!nome || !email || !whats) {
                 alert("Por favor, preencha Nome, E-mail e WhatsApp antes de continuar.");
                 return;
             }
 
-            const btnPix = document.getElementById('btnDispararPix');
-            btnPix.innerText = "⏳ A gerar chave PIX...";
+            var btnPix = document.getElementById('btnDispararPix');
+            btnPix.innerText = "⏳ Gerando chave PIX oficial...";
             btnPix.disabled = true;
 
             try {
-                const response = await fetch("/api/criar-pix", {
+                var response = await fetch("/api/criar-pix", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ nome: nome, email: email, codigo_car: car })
+                    body: JSON.stringify({ 
+                        nome: nome, 
+                        documento: documento,
+                        email: email, 
+                        codigo_car: car 
+                    })
                 });
 
-                const data = await response.json();
+                var data = await response.json();
                 
                 if(response.ok && data.status === "sucesso") {
                     document.getElementById('codigoPixTexto').innerText = data.pix_copia_cola;
                     
-                    const containerQr = document.getElementById('qrCodeImgContainer');
+                    var containerQr = document.getElementById('qrCodeImgContainer');
                     if(data.qr_code_base64 && data.qr_code_base64.length > 20) {
-                        containerQr.innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" style="width:160px; height:160px; border-radius:8px; border:1px solid #cbd5e1; display:block; margin:0 auto;"/>`;
+                        containerQr.innerHTML = '<img src="data:image/png;base64,' + data.qr_code_base64 + '" style="width:160px; height:160px; border-radius:8px; border:1px solid #cbd5e1; display:block; margin:0 auto;"/>';
                     } else {
                         containerQr.innerHTML = "";
                     }
@@ -409,7 +419,6 @@
                 }
             } catch(e) {
                 console.error("Erro na comunicação PIX:", e);
-                // Fallback seguro caso o serviço esteja offline
                 document.getElementById('codigoPixTexto').innerText = "00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD";
                 document.getElementById('blocoPagamento').style.display = 'none';
                 document.getElementById('blocoPixDisplay').style.display = 'block';
@@ -420,23 +429,24 @@
         }
 
         function copiarCodigoPix() {
-            const codigo = document.getElementById('codigoPixTexto').innerText.trim();
-            navigator.clipboard.writeText(codigo).then(() => {
-                const btn = document.getElementById('btnCopiar');
+            var codigo = document.getElementById('codigoPixTexto').innerText.trim();
+            navigator.clipboard.writeText(codigo).then(function() {
+                var btn = document.getElementById('btnCopiar');
                 btn.style.background = '#16a34a';
                 btn.innerText = '✓ Código Copiado!';
-                setTimeout(() => {
+                setTimeout(function() {
                     btn.style.background = '#0369a1';
                     btn.innerText = '📋 Copiar Código PIX';
                 }, 2500);
             });
         }
 
-        async function concluirBaixar(tipoMetodo = "PIX") {
-            const nome = document.getElementById('inputNome').value.trim() || "Produtor Rural";
-            const email = document.getElementById('inputEmail').value.trim() || "contato@fazenda.com.br";
-            const whats = document.getElementById('inputWhats').value.trim() || "00000000";
-            const car = document.getElementById('carInput').value.trim() || "MT-PADRAO";
+        async function concluirBaixar(tipoMetodo) {
+            tipoMetodo = tipoMetodo || "PIX";
+            var nome = document.getElementById('inputNome').value.trim() || "Produtor Rural";
+            var email = document.getElementById('inputEmail').value.trim() || "contato@fazenda.com.br";
+            var whats = document.getElementById('inputWhats').value.trim() || "00000000";
+            var car = document.getElementById('carInput').value.trim() || "MT-PADRAO";
 
             try {
                 await fetch("/api/salvar-lead", {
@@ -451,13 +461,13 @@
                     })
                 });
             } catch (e) {
-                console.error("Erro ao guardar registo:", e);
+                console.error("Erro ao guardar registro:", e);
             }
 
-            const urlDownload = `/api/download-laudo?car=${encodeURIComponent(car)}&nome=${encodeURIComponent(nome)}&email=${encodeURIComponent(email)}`;
+            var urlDownload = "/api/download-laudo?car=" + encodeURIComponent(car) + "&nome=" + encodeURIComponent(nome) + "&email=" + encodeURIComponent(email);
             window.location.href = urlDownload;
 
-            setTimeout(() => { fecharModal(); }, 1200);
+            setTimeout(function() { fecharModal(); }, 1200);
         }
     </script>
 </body>
