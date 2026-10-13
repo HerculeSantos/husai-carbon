@@ -8,6 +8,8 @@ from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
+import mercadopago
+
 from backend.modules.gerar_laudo import emitir_laudo_husai_completo
 
 app = FastAPI(title="Husai Carbon API")
@@ -16,6 +18,9 @@ security = HTTPBasic()
 # Credenciais de acesso ao Painel Admin
 ADMIN_USER = "admin"
 ADMIN_PASS = "husai2026"
+
+# Token do Mercado Pago (Substitua pelo seu Token de Produção ou Teste do Mercado Pago)
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "SEU_ACCESS_TOKEN_DO_MERCADO_PAGO")
 
 def verificar_admin(credentials: HTTPBasicCredentials = Depends(security)):
     user_correto = secrets.compare_digest(credentials.username, ADMIN_USER)
@@ -57,11 +62,64 @@ class LeadModel(BaseModel):
     codigo_car: str
     metodo: str
 
+class PixRequestModel(BaseModel):
+    nome: str
+    email: str
+    codigo_car: str
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     caminho_html = os.path.join("frontend", "index.html")
     with open(caminho_html, "r", encoding="utf-8") as f:
         return f.read()
+
+@app.post("/api/criar-pix")
+def criar_pix(dados: PixRequestModel):
+    valor_dossie = 350.00
+    
+    # Se o token padrão ainda não foi configurado, devolve chave de teste segura
+    if MP_ACCESS_TOKEN == "SEU_ACCESS_TOKEN_DO_MERCADO_PAGO":
+        return {
+            "status": "sucesso",
+            "simulado": True,
+            "id_pagamento": "simulado_123456",
+            "pix_copia_cola": "00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD",
+            "qr_code_base64": ""
+        }
+
+    try:
+        sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
+        partes_nome = dados.nome.split(" ", 1)
+        primeiro_nome = partes_nome[0]
+        sobrenome = partes_nome[1] if len(partes_nome) > 1 else "Rural"
+
+        payment_data = {
+            "transaction_amount": valor_dossie,
+            "description": f"Dossiê Técnico Husai Carbon - CAR {dados.codigo_car}",
+            "payment_method_id": "pix",
+            "payer": {
+                "email": dados.email,
+                "first_name": primeiro_nome,
+                "last_name": sobrenome,
+            }
+        }
+
+        payment_response = sdk.payment().create(payment_data)
+        payment = payment_response.get("response", {})
+        
+        pix_info = payment.get("point_of_interaction", {}).get("transaction_data", {})
+        copia_cola = pix_info.get("qr_code")
+        qr_base64 = pix_info.get("qr_code_base64")
+
+        return {
+            "status": "sucesso",
+            "simulado": False,
+            "id_pagamento": payment.get("id"),
+            "pix_copia_cola": copia_cola,
+            "qr_code_base64": qr_base64
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar cobrança PIX: {str(e)}")
 
 @app.post("/api/salvar-lead")
 def salvar_lead(lead: LeadModel):
@@ -90,7 +148,7 @@ def download_laudo(
         "codigo_car": car,
         "proprietario": nome,
         "contato": email,
-        "coordenadas_ref": "-12.5641,-55.7215;-12.5890,-55.7001",
+        "coordenadas_ref": "-12.5641, -55.7215 (Médio-Norte MT)",
         "area_total_ha": 2500.0,
         "area_consolidada_ha": 1625.0,
         "reserva_legal_ha": 750.0,

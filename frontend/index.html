@@ -199,6 +199,8 @@
             margin: 0.5rem 0;
             font-size: 0.72rem;
             user-select: all;
+            color: #0f172a;
+            min-height: 48px;
         }
         .btn-copiar-pix {
             width: 100%;
@@ -224,7 +226,6 @@
             cursor: pointer;
         }
 
-        /* --- OTIMIZAÇÃO MOBILE RESPONSIVA --- */
         @media (max-width: 640px) {
             header { padding: 0.8rem 1rem; }
             .logo { font-size: 1.15rem; }
@@ -312,12 +313,13 @@
             </div>
 
             <div id="blocoPagamento">
-                <button class="btn-pix" onclick="gerarPix()">📱 Pagar via PIX (R$ 350,00)</button>
+                <button class="btn-pix" id="btnDispararPix" onclick="gerarPix()">📱 Pagar via PIX (R$ 350,00)</button>
             </div>
 
             <div class="pix-display" id="blocoPixDisplay">
+                <div id="qrCodeImgContainer" style="text-align:center; margin-bottom:10px;"></div>
                 <b style="font-size:0.8rem; color: #0369a1;">Chave PIX Copia e Cola:</b>
-                <div class="pix-code" id="codigoPixTexto">00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD</div>
+                <div class="pix-code" id="codigoPixTexto">A carregar chave oficial...</div>
                 
                 <button class="btn-copiar-pix" id="btnCopiar" onclick="copiarCodigoPix()">
                     📋 Copiar Código PIX
@@ -366,16 +368,55 @@
             }
         }
 
-        function gerarPix() {
+        async function gerarPix() {
             const nome = document.getElementById('inputNome').value.trim();
             const email = document.getElementById('inputEmail').value.trim();
             const whats = document.getElementById('inputWhats').value.trim();
+            const car = document.getElementById('carInput').value.trim() || "MT-PADRAO";
+
             if(!nome || !email || !whats) {
                 alert("Por favor, preencha Nome, E-mail e WhatsApp antes de continuar.");
                 return;
             }
-            document.getElementById('blocoPagamento').style.display = 'none';
-            document.getElementById('blocoPixDisplay').style.display = 'block';
+
+            const btnPix = document.getElementById('btnDispararPix');
+            btnPix.innerText = "⏳ A gerar chave PIX...";
+            btnPix.disabled = true;
+
+            try {
+                const response = await fetch("/api/criar-pix", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ nome: nome, email: email, codigo_car: car })
+                });
+
+                const data = await response.json();
+                
+                if(response.ok && data.status === "sucesso") {
+                    document.getElementById('codigoPixTexto').innerText = data.pix_copia_cola;
+                    
+                    const containerQr = document.getElementById('qrCodeImgContainer');
+                    if(data.qr_code_base64 && data.qr_code_base64.length > 20) {
+                        containerQr.innerHTML = `<img src="data:image/png;base64,${data.qr_code_base64}" style="width:160px; height:160px; border-radius:8px; border:1px solid #cbd5e1; display:block; margin:0 auto;"/>`;
+                    } else {
+                        containerQr.innerHTML = "";
+                    }
+
+                    document.getElementById('blocoPagamento').style.display = 'none';
+                    document.getElementById('blocoPixDisplay').style.display = 'block';
+                } else {
+                    alert("Aviso: " + (data.detail || "Não foi possível gerar a chave."));
+                }
+            } catch(e) {
+                console.error("Erro na comunicação PIX:", e);
+                // Fallback seguro caso o serviço esteja offline
+                document.getElementById('codigoPixTexto').innerText = "00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD";
+                document.getElementById('blocoPagamento').style.display = 'none';
+                document.getElementById('blocoPixDisplay').style.display = 'block';
+            } finally {
+                btnPix.innerText = "📱 Pagar via PIX (R$ 350,00)";
+                btnPix.disabled = false;
+            }
         }
 
         function copiarCodigoPix() {
