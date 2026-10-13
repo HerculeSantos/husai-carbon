@@ -76,19 +76,16 @@
             margin-top: 1.5rem;
             background: white;
             border-radius: 12px;
-            border: 2px solid #52b788;
-            box-shadow: 0 10px 25px rgba(45, 106, 79, 0.12);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
             overflow: hidden;
         }
         .preview-header {
-            background: var(--accent);
             padding: 1rem 1.2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 0.5rem;
         }
-        .preview-header h3 { font-size: 1rem; color: var(--primary); font-weight: 700; }
         .preview-body { padding: 1.5rem 1.2rem; text-align: center; }
         .callout-money {
             background: #fffbeb;
@@ -98,6 +95,16 @@
             margin: 1rem 0 1.2rem 0;
         }
         .callout-money h2 { font-size: 2rem; color: #b7791f; font-weight: 800; margin: 0.3rem 0; }
+        .callout-embargo {
+            background: #fef2f2;
+            border: 2px dashed #dc2626;
+            padding: 1.2rem 1rem;
+            border-radius: 10px;
+            margin: 1rem 0 1.2rem 0;
+            text-align: left;
+        }
+        .callout-embargo h3 { color: #991b1b; font-size: 1.1rem; margin-bottom: 0.4rem; font-weight: 800; }
+        .callout-embargo p { color: #450a0a; font-size: 0.85rem; line-height: 1.4; margin-bottom: 0.4rem; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem; text-align: left; }
         .stat-item { background: #f8fafc; padding: 0.85rem; border-radius: 8px; border: 1px solid #e2e8f0; }
         .stat-item small { color: #64748b; font-size: 0.72rem; display: block; }
@@ -112,9 +119,18 @@
             font-weight: 700;
             cursor: pointer;
             border: none;
-            transition: background 0.2s;
         }
-        .btn-desbloquear:hover { background: #1b4332; }
+        .btn-regularizar {
+            width: 100%;
+            background: #dc2626;
+            color: white;
+            padding: 1.1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+        }
         .modal-overlay {
             display: none;
             position: fixed;
@@ -144,7 +160,6 @@
             border: none;
             background: none;
             color: #64748b;
-            padding: 0.3rem;
         }
         .form-group { margin-bottom: 0.85rem; text-align: left; }
         .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 0.3rem; }
@@ -156,90 +171,13 @@
             font-size: 0.95rem;
             outline: none;
         }
-        .form-group input:focus { border-color: var(--primary-light); }
         .cupom-box { display: flex; gap: 0.5rem; }
-        .btn-aplicar {
-            background: #334155;
-            color: white;
-            border: none;
-            padding: 0 1rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.85rem;
-        }
-        .btn-pix {
-            width: 100%;
-            background: #0284c7;
-            color: white;
-            border: none;
-            padding: 0.95rem;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: 0.8rem;
-        }
-        .pix-display {
-            display: none;
-            background: #f0f9ff;
-            border: 1px solid #bae6fd;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-top: 1rem;
-            text-align: left;
-        }
-        .pix-code {
-            background: white;
-            padding: 0.65rem;
-            border-radius: 6px;
-            border: 1px solid #cbd5e1;
-            font-family: monospace;
-            word-break: break-all;
-            margin: 0.5rem 0;
-            font-size: 0.72rem;
-            user-select: all;
-            color: #0f172a;
-            min-height: 48px;
-        }
-        .btn-copiar-pix {
-            width: 100%;
-            background: #0369a1;
-            color: white;
-            border: none;
-            padding: 0.7rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-bottom: 0.7rem;
-        }
-        .btn-baixar-pronto {
-            width: 100%;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.95rem;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 0.95rem;
-            cursor: pointer;
-        }
-
-        @media (max-width: 640px) {
-            header { padding: 0.8rem 1rem; }
-            .logo { font-size: 1.15rem; }
-            .badge-gov { font-size: 0.65rem; padding: 0.2rem 0.5rem; }
-            .hero h1 { font-size: 1.4rem; }
-            .hero p { font-size: 0.85rem; }
-            .search-card { padding: 1.2rem; }
-            .search-box { flex-direction: column; }
-            .btn-consultar { width: 100%; padding: 0.85rem; }
-            .stats-grid { grid-template-columns: 1fr; gap: 0.5rem; }
-            .callout-money h2 { font-size: 1.7rem; }
-            .modal-content { padding: 1.4rem 1.1rem; }
-            .btn-desbloquear { font-size: 0.9rem; padding: 1rem 0.8rem; }
-        }
+        .btn-aplicar { background: #334155; color: white; border: none; padding: 0 1rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+        .btn-pix { width: 100%; background: #0284c7; color: white; border: none; padding: 0.95rem; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; margin-top: 0.8rem; }
+        .pix-display { display: none; background: #f0f9ff; border: 1px solid #bae6fd; padding: 1rem; border-radius: 8px; margin-top: 1rem; text-align: left; }
+        .pix-code { background: white; padding: 0.65rem; border-radius: 6px; border: 1px solid #cbd5e1; font-family: monospace; word-break: break-all; margin: 0.5rem 0; font-size: 0.72rem; user-select: all; color: #0f172a; min-height: 48px; }
+        .btn-copiar-pix { width: 100%; background: #0369a1; color: white; border: none; padding: 0.7rem; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; margin-bottom: 0.7rem; }
+        .btn-baixar-pronto { width: 100%; background: var(--primary); color: white; border: none; padding: 0.95rem; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -251,20 +189,24 @@
     <div class="container">
         <div class="hero">
             <h1>Descubra quanto a sua Reserva Legal e APP podem gerar em Ativos</h1>
-            <p>Auditoria geoespacial instantânea de conformidade e cálculo de elegibilidade para CPR Verde e estatal CMAA-MT.</p>
+            <p>Auditoria geoespacial instantânea de conformidade e elegibilidade para CPR Verde e estatal CMAA-MT.</p>
         </div>
 
         <div class="search-card">
             <label style="font-size: 0.82rem; font-weight: 700; color: #475569;">CÓDIGO OFICIAL DO CAR (SICAR-MT)</label>
             <div class="search-box">
                 <input type="text" id="carInput" value="MT-5104557-00982341">
-                <button type="button" class="btn-consultar" id="btnConsultarCar" onclick="consultarCAR()">Auditar Imóvel</button>
+                <button type="button" class="btn-consultar" onclick="consultarCAR()">Auditar Imóvel</button>
             </div>
+            <small style="color:#64748b; font-size:0.75rem; display:block; margin-top:0.4rem;">
+                * Dica de homologação: digite <b>MT-EMBARGO-TESTE</b> para testar a rota de fazenda com pendência.
+            </small>
         </div>
 
-        <div class="preview-card" id="previewBox">
-            <div class="preview-header">
-                <h3>Fazenda Auditada | Médio-Norte MT</h3>
+        <!-- CENÁRIO A: APTO -->
+        <div class="preview-card" id="previewBoxApto" style="border: 2px solid #52b788;">
+            <div class="preview-header" style="background: var(--accent);">
+                <h3 style="color: var(--primary);">Fazenda Auditada | Médio-Norte MT</h3>
                 <span style="font-size: 0.75rem; font-weight: 700; color: #2d6a4f;">STATUS: APTO</span>
             </div>
             <div class="preview-body">
@@ -278,18 +220,37 @@
                     <div class="stat-item"><small>ÁREA PRESERVADA</small><strong>875,00 ha</strong></div>
                     <div class="stat-item"><small>ESTOQUE ESTIMADO</small><strong>1.750 tCO2e/ano</strong></div>
                 </div>
-                <button type="button" class="btn-desbloquear" onclick="abrirModal()">
+                <button type="button" class="btn-desbloquear" onclick="abrirModal('APTO')">
                     🔒 Desbloquear Dossiê Técnico Completo (PDF)
+                </button>
+            </div>
+        </div>
+
+        <!-- CENÁRIO B: EMBARGO / RESTRITO -->
+        <div class="preview-card" id="previewBoxBloqueado" style="border: 2px solid #dc2626;">
+            <div class="preview-header" style="background: #fee2e2;">
+                <h3 style="color: #991b1b;">Fazenda Auditada | Pendência Detectada</h3>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #dc2626;">STATUS: RESTRITO</span>
+            </div>
+            <div class="preview-body">
+                <div class="callout-embargo">
+                    <h3>⚠️ Imóvel com Termo de Embargo Ativo na SEMA-MT</h3>
+                    <p>Detectamos uma restrição ambiental administrativa no cadastro do imóvel. A valoração econômica para CPR Verde fica suspensa até a conclusão da regularização.</p>
+                    <p><b>Solução:</b> A elaboração de um <b>Plano de Recuperação (PRADA)</b> ou defesa técnica restabelece a conformidade jurídica da propriedade.</p>
+                </div>
+                <button type="button" class="btn-regularizar" onclick="abrirModal('BLOQUEADO_RESTRICAO')">
+                    📑 Baixar Diagnóstico de Restrição & Acionar Consultor
                 </button>
             </div>
         </div>
     </div>
 
+    <!-- MODAL DE CHECKOUT -->
     <div class="modal-overlay" id="modalCheckout">
         <div class="modal-content">
             <button type="button" class="modal-close" onclick="fecharModal()">&times;</button>
-            <h2 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.3rem;">Emissão do Dossiê Técnico</h2>
-            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;">Preencha os dados do titular para emissão do laudo com validação criptográfica.</p>
+            <h2 id="modalTitulo" style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.3rem;">Emissão do Dossiê Técnico</h2>
+            <p id="modalDesc" style="font-size: 0.8rem; color: #64748b; margin-bottom: 1rem;">Preencha os dados do titular para emissão do laudo com validação criptográfica.</p>
 
             <div class="form-group">
                 <label>Nome Completo ou Razão Social</label>
@@ -307,7 +268,7 @@
                 <label>WhatsApp para Notificações</label>
                 <input type="tel" id="inputWhats" placeholder="Ex: (66) 99988-7766">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="grupoCupom">
                 <label>Cupom de Acesso</label>
                 <div class="cupom-box">
                     <input type="text" id="inputCupom" placeholder="Ex: PIONEIRO-MT" style="text-transform: uppercase;">
@@ -329,7 +290,7 @@
                     📋 Copiar Código PIX
                 </button>
                 
-                <button type="button" class="btn-baixar-pronto" onclick="concluirBaixar('PIX')">
+                <button type="button" class="btn-baixar-pronto" id="btnConcluir" onclick="concluirBaixar('PIX')">
                     ✅ Confirmar Pagamento e Baixar Dossiê
                 </button>
             </div>
@@ -337,22 +298,52 @@
     </div>
 
     <script>
+        var statusAtualConsulta = "APTO";
+
         function consultarCAR() {
-            var preview = document.getElementById('previewBox');
-            if(preview) {
-                preview.style.display = 'block';
-                preview.scrollIntoView({ behavior: 'smooth' });
+            var car = document.getElementById('carInput').value.trim().toUpperCase();
+            var boxApto = document.getElementById('previewBoxApto');
+            var boxBloq = document.getElementById('previewBoxBloqueado');
+
+            if(car.indexOf("EMBARGO") !== -1 || car.indexOf("BLOQ") !== -1) {
+                statusAtualConsulta = "BLOQUEADO_RESTRICAO";
+                boxApto.style.display = 'none';
+                boxBloq.style.display = 'block';
+                boxBloq.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                statusAtualConsulta = "APTO";
+                boxBloq.style.display = 'none';
+                boxApto.style.display = 'block';
+                boxApto.scrollIntoView({ behavior: 'smooth' });
             }
         }
 
-        function abrirModal() {
+        function abrirModal(tipoStatus) {
+            statusAtualConsulta = tipoStatus || "APTO";
             var modal = document.getElementById('modalCheckout');
-            if(modal) modal.style.display = 'flex';
+            var modalTitulo = document.getElementById('modalTitulo');
+            var modalDesc = document.getElementById('modalDesc');
+            var btnPix = document.getElementById('btnDispararPix');
+
+            if(statusAtualConsulta === "BLOQUEADO_RESTRICAO") {
+                modalTitulo.innerText = "Diagnóstico Técnico de Restrição";
+                modalTitulo.style.color = "#991b1b";
+                modalDesc.innerText = "Preencha seus dados para receber o parecer do embargo e acionar o consultor especialista.";
+                btnPix.innerText = "📱 Baixar Parecer & Abrir WhatsApp de Regularização (R$ 350,00)";
+                btnPix.style.background = "#dc2626";
+            } else {
+                modalTitulo.innerText = "Emissão do Dossiê Técnico";
+                modalTitulo.style.color = "#1b4332";
+                modalDesc.innerText = "Preencha os dados do titular para emissão do laudo com validação criptográfica.";
+                btnPix.innerText = "📱 Pagar via PIX (R$ 350,00)";
+                btnPix.style.background = "#0284c7";
+            }
+
+            modal.style.display = 'flex';
         }
 
         function fecharModal() {
-            var modal = document.getElementById('modalCheckout');
-            if(modal) modal.style.display = 'none';
+            document.getElementById('modalCheckout').style.display = 'none';
         }
 
         function validarCupom() {
@@ -364,7 +355,7 @@
                 msg.style.display = 'block';
                 msg.style.color = '#16a34a';
                 msg.innerText = "✓ Cupom Pioneiro aplicado! Desconto integral de 100%.";
-                blocoPag.innerHTML = '<button type="button" class="btn-baixar-pronto" onclick="concluirBaixar(\'CUPOM-PIONEIRO\')">🚀 Baixar Dossiê Imediatamente (Grátis)</button>';
+                blocoPag.innerHTML = '<button type="button" class="btn-baixar-pronto" onclick="concluirBaixar(\'CUPOM-PIONEIRO\')">🚀 Baixar Documento Imediatamente (Grátis)</button>';
             } else {
                 msg.style.display = 'block';
                 msg.style.color = '#dc2626';
@@ -385,40 +376,32 @@
             }
 
             var btnPix = document.getElementById('btnDispararPix');
-            btnPix.innerText = "⏳ Gerando chave PIX oficial...";
+            btnPix.innerText = "⏳ Gerando chave PIX...";
             btnPix.disabled = true;
 
             try {
                 var response = await fetch("/api/criar-pix", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ 
-                        nome: nome, 
-                        documento: documento,
-                        email: email, 
-                        codigo_car: car 
-                    })
+                    body: JSON.stringify({ nome: nome, documento: documento, email: email, codigo_car: car })
                 });
-
                 var data = await response.json();
                 
                 if(response.ok && data.status === "sucesso") {
                     document.getElementById('codigoPixTexto').innerText = data.pix_copia_cola;
-                    
                     var containerQr = document.getElementById('qrCodeImgContainer');
                     if(data.qr_code_base64 && data.qr_code_base64.length > 20) {
                         containerQr.innerHTML = '<img src="data:image/png;base64,' + data.qr_code_base64 + '" style="width:160px; height:160px; border-radius:8px; border:1px solid #cbd5e1; display:block; margin:0 auto;"/>';
                     } else {
                         containerQr.innerHTML = "";
                     }
-
                     document.getElementById('blocoPagamento').style.display = 'none';
                     document.getElementById('blocoPixDisplay').style.display = 'block';
                 } else {
-                    alert("Aviso: " + (data.detail || "Não foi possível gerar a chave."));
+                    alert("Aviso: " + (data.detail || "Não foi possível gerar o pagamento."));
                 }
             } catch(e) {
-                console.error("Erro na comunicação PIX:", e);
+                console.error("Erro PIX:", e);
                 document.getElementById('codigoPixTexto').innerText = "00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD";
                 document.getElementById('blocoPagamento').style.display = 'none';
                 document.getElementById('blocoPixDisplay').style.display = 'block';
@@ -457,17 +440,32 @@
                         email: email,
                         whatsapp: whats,
                         codigo_car: car,
-                        metodo: tipoMetodo
+                        metodo: tipoMetodo,
+                        status: statusAtualConsulta,
+                        consultor_id: 1
                     })
                 });
             } catch (e) {
-                console.error("Erro ao guardar registro:", e);
+                console.error("Erro registro lead:", e);
             }
 
-            var urlDownload = "/api/download-laudo?car=" + encodeURIComponent(car) + "&nome=" + encodeURIComponent(nome) + "&email=" + encodeURIComponent(email);
+            var urlDownload = "/api/download-laudo?car=" + encodeURIComponent(car) + 
+                              "&nome=" + encodeURIComponent(nome) + 
+                              "&email=" + encodeURIComponent(email) + 
+                              "&status_laudo=" + encodeURIComponent(statusAtualConsulta);
+            
             window.location.href = urlDownload;
 
-            setTimeout(function() { fecharModal(); }, 1200);
+            if(statusAtualConsulta === "BLOQUEADO_RESTRICAO") {
+                setTimeout(function() {
+                    var textoWhats = "Olá, acabei de emitir o Parecer de Restrição do imóvel CAR " + car + " na Husai Carbon e preciso de suporte com a consultoria para desembaraço e regularização ambiental.";
+                    var urlWhats = "https://wa.me/5566996543210?text=" + encodeURIComponent(textoWhats);
+                    window.open(urlWhats, '_blank');
+                    fecharModal();
+                }, 1500);
+            } else {
+                setTimeout(function() { fecharModal(); }, 1200);
+            }
         }
     </script>
 </body>

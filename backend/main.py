@@ -41,6 +41,7 @@ DB_PATH = "leads_husai.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    # Tabela de Leads e Auditorias
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS leads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,9 +51,30 @@ def init_db():
             codigo_car TEXT,
             metodo TEXT,
             status TEXT DEFAULT 'APTO',
+            consultor_id INTEGER,
             criado_em TEXT
         )
     """)
+    # Tabela de Consultores Parceiros
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS consultores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT,
+            registro_classe TEXT,
+            email TEXT UNIQUE,
+            whatsapp TEXT,
+            creditos_saldo INTEGER DEFAULT 10,
+            criado_em TEXT
+        )
+    """)
+    # Criar consultor demonstrativo caso não exista
+    cursor.execute("SELECT id FROM consultores WHERE email = 'parceiro@agroconsult.com.br'")
+    if not cursor.fetchone():
+        cursor.execute("""
+            INSERT INTO consultores (nome, registro_classe, email, whatsapp, creditos_saldo, criado_em)
+            VALUES ('AgroConsult Engenharia Florestal', 'CREA-MT 18942/D', 'parceiro@agroconsult.com.br', '(66) 99654-3210', 10, ?)
+        """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
+
     conn.commit()
     conn.close()
 
@@ -64,6 +86,8 @@ class LeadModel(BaseModel):
     whatsapp: str
     codigo_car: str
     metodo: str
+    status: str = "APTO"
+    consultor_id: int = None
 
 class PixRequestModel(BaseModel):
     nome: str
@@ -82,7 +106,7 @@ def criar_pix(dados: PixRequestModel):
     valor_dossie = 350.00
     
     if not MP_ACCESS_TOKEN or MP_ACCESS_TOKEN == "SEU_ACCESS_TOKEN_DO_MERCADO_PAGO":
-        print("[PIX AVISO] MP_ACCESS_TOKEN não configurado. Retornando fallback simulado.")
+        print("[PIX AVISO] MP_ACCESS_TOKEN não configurado. Retornando fallback.")
         return {
             "status": "sucesso",
             "simulado": True,
@@ -97,17 +121,13 @@ def criar_pix(dados: PixRequestModel):
         primeiro_nome = partes_nome[0]
         sobrenome = partes_nome[1] if len(partes_nome) > 1 else "Rural"
 
-        # Tratamento dinâmico de CPF ou CNPJ
         doc_limpo = re.sub(r"\D", "", dados.documento)
         if len(doc_limpo) == 14:
-            tipo_doc = "CNPJ"
-            numero_doc = doc_limpo
+            tipo_doc, numero_doc = "CNPJ", doc_limpo
         elif len(doc_limpo) == 11:
-            tipo_doc = "CPF"
-            numero_doc = doc_limpo
+            tipo_doc, numero_doc = "CPF", doc_limpo
         else:
-            tipo_doc = "CPF"
-            numero_doc = "19119119100"  # Padrão válido para homologação se o campo ficar vazio
+            tipo_doc, numero_doc = "CPF", "19119119100"
 
         payment_data = {
             "transaction_amount": float(valor_dossie),
@@ -117,24 +137,18 @@ def criar_pix(dados: PixRequestModel):
                 "email": dados.email.strip(),
                 "first_name": primeiro_nome,
                 "last_name": sobrenome,
-                "identification": {
-                    "type": tipo_doc,
-                    "number": numero_doc
-                }
+                "identification": { "type": tipo_doc, "number": numero_doc }
             }
         }
 
         payment_response = sdk.payment().create(payment_data)
         payment = payment_response.get("response", {})
-        status_http = payment_response.get("status")
-        print(f"[PIX MP RESPOSTA] Status HTTP: {status_http}")
-
+        
         pix_info = payment.get("point_of_interaction", {}).get("transaction_data", {})
         copia_cola = pix_info.get("qr_code")
         qr_base64 = pix_info.get("qr_code_base64")
 
         if copia_cola:
-            print("[PIX MP SUCESSO] Chave real gerada com sucesso via Mercado Pago.")
             return {
                 "status": "sucesso",
                 "simulado": False,
@@ -143,8 +157,6 @@ def criar_pix(dados: PixRequestModel):
                 "qr_code_base64": qr_base64
             }
         else:
-            erro_detalhe = payment.get("message") or payment.get("cause") or str(payment)
-            print(f"[PIX ERRO MP RETORNO]: {erro_detalhe}")
             return {
                 "status": "sucesso",
                 "simulado": True,
@@ -152,11 +164,9 @@ def criar_pix(dados: PixRequestModel):
                 "pix_copia_cola": "00020126580014br.gov.bcb.pix0136husaicarbon-ficticio-teste520400005303986540350.005802BR5920HUSAI TECNOLOGIA6009IPIRANGA62070503***6304ABCD",
                 "qr_code_base64": ""
             }
-
     except Exception as e:
-        print("[PIX EXCECAO CRITICA]:")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erro interno ao gerar PIX: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar PIX: {str(e)}")
 
 @app.post("/api/salvar-lead")
 def salvar_lead(lead: LeadModel):
@@ -164,9 +174,9 @@ def salvar_lead(lead: LeadModel):
     cursor = conn.cursor()
     data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("""
-        INSERT INTO leads (nome, email, whatsapp, codigo_car, metodo, status, criado_em)
-        VALUES (?, ?, ?, ?, ?, 'APTO', ?)
-    """, (lead.nome, lead.email, lead.whatsapp, lead.codigo_car, lead.metodo, data_hora))
+        INSERT INTO leads (nome, email, whatsapp, codigo_car, metodo, status, consultor_id, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (lead.nome, lead.email, lead.whatsapp, lead.codigo_car, lead.metodo, lead.status, lead.consultor_id, data_hora))
     conn.commit()
     conn.close()
     return {"status": "sucesso", "mensagem": "Lead registrada com sucesso"}
@@ -175,7 +185,8 @@ def salvar_lead(lead: LeadModel):
 def download_laudo(
     car: str = Query("MT-5104557-00982341"),
     nome: str = Query("Produtor Rural"),
-    email: str = Query("contato@fazenda.com.br")
+    email: str = Query("contato@fazenda.com.br"),
+    status_laudo: str = Query("APTO")
 ):
     nome_limpo_car = car.replace("/", "_").replace("-", "_").replace(" ", "_")
     nome_arquivo_pdf = f"laudo_{nome_limpo_car}.pdf"
@@ -201,7 +212,7 @@ def download_laudo(
         "registro": "CREA-MT 12345/D"
     }
 
-    emitir_laudo_husai_completo(dados_imovel, dados_consultor, caminho_pdf)
+    emitir_laudo_husai_completo(dados_imovel, dados_consultor, caminho_pdf, status_conformidade=status_laudo)
 
     return FileResponse(
         path=caminho_pdf,
@@ -216,6 +227,7 @@ def validar_dossie(codigo: str):
         conteudo = f.read()
     return conteudo.replace("{{CODIGO}}", codigo)
 
+# PAINEL GERAL ADMINISTRATIVO HUSAI
 @app.get("/admin", response_class=HTMLResponse)
 def painel_admin(username: str = Depends(verificar_admin)):
     conn = sqlite3.connect(DB_PATH)
@@ -226,6 +238,8 @@ def painel_admin(username: str = Depends(verificar_admin)):
 
     tabela_html = ""
     for r in linhas:
+        badge_cor = "#2e7d32" if r[6] == "APTO" else "#b91c1c"
+        badge_bg = "#e8f5e9" if r[6] == "APTO" else "#fee2e2"
         tabela_html += f"""
         <tr>
             <td style="padding:10px; border-bottom:1px solid #ddd;">{r[0]}</td>
@@ -233,8 +247,8 @@ def painel_admin(username: str = Depends(verificar_admin)):
             <td style="padding:10px; border-bottom:1px solid #ddd;">{r[2]}</td>
             <td style="padding:10px; border-bottom:1px solid #ddd;">{r[3]}</td>
             <td style="padding:10px; border-bottom:1px solid #ddd; font-family:monospace;">{r[4]}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd;"><span style="background:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{r[5]}</span></td>
-            <td style="padding:10px; border-bottom:1px solid #ddd;"><span style="background:#fef3c7; color:#92400e; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{r[6]}</span></td>
+            <td style="padding:10px; border-bottom:1px solid #ddd;"><b>{r[5]}</b></td>
+            <td style="padding:10px; border-bottom:1px solid #ddd;"><span style="background:{badge_bg}; color:{badge_cor}; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{r[6]}</span></td>
             <td style="padding:10px; border-bottom:1px solid #ddd; font-size:12px; color:#666;">{r[7]}</td>
         </tr>
         """
@@ -244,16 +258,14 @@ def painel_admin(username: str = Depends(verificar_admin)):
     <html lang="pt-BR">
     <head>
         <meta charset="UTF-8">
-        <title>HUSAI CARBON | Painel de Leads</title>
+        <title>HUSAI CARBON | Painel Central</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
             body {{ font-family: 'Inter', sans-serif; background: #f8f9fa; padding: 2rem; color: #333; }}
-            .container {{ max-width: 1050px; margin: 0 auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }}
+            .container {{ max-width: 1100px; margin: 0 auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }}
             .topo {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }}
             h1 {{ color: #1b4332; font-size: 1.5rem; margin-bottom: 0.3rem; }}
-            p {{ color: #666; font-size: 0.9rem; margin: 0; }}
             .btn-csv {{ background: #2d6a4f; color: white; text-decoration: none; padding: 0.7rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 700; }}
-            .btn-csv:hover {{ background: #1b4332; }}
             table {{ width: 100%; border-collapse: collapse; text-align: left; margin-top: 1rem; }}
             th {{ background: #1b4332; color: white; padding: 10px; font-size: 13px; text-transform: uppercase; }}
         </style>
@@ -262,28 +274,99 @@ def painel_admin(username: str = Depends(verificar_admin)):
         <div class="container">
             <div class="topo">
                 <div>
-                    <h1>HUSAI CARBON — Relatório de Clientes & Leads</h1>
-                    <p>Registros capturados via formulário e validações em tempo real.</p>
+                    <h1>HUSAI CARBON — Painel Geral de Auditorias & Leads</h1>
+                    <p>Controle de Dossiês Emitidos e Demandas de Regularização.</p>
                 </div>
-                <a href="/admin/exportar-csv" class="btn-csv">📥 Baixar Planilha (.CSV)</a>
+                <div>
+                    <a href="/consultor/dashboard" style="margin-right: 10px; color: #1b4332; font-weight:bold; font-size:0.85rem;">Portal do Consultor &rarr;</a>
+                    <a href="/admin/exportar-csv" class="btn-csv">📥 Baixar Planilha (.CSV)</a>
+                </div>
             </div>
             <table>
                 <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nome / Razão</th>
-                        <th>E-mail</th>
-                        <th>WhatsApp</th>
-                        <th>CAR</th>
-                        <th>Método</th>
-                        <th>Status</th>
-                        <th>Data/Hora</th>
-                    </tr>
+                    <tr><th>ID</th><th>Nome / Razão</th><th>E-mail</th><th>WhatsApp</th><th>CAR</th><th>Método</th><th>Status</th><th>Data/Hora</th></tr>
                 </thead>
-                <tbody>
-                    {tabela_html}
-                </tbody>
+                <tbody>{tabela_html}</tbody>
             </table>
+        </div>
+    </body>
+    </html>
+    """
+
+# PORTAL EXCLUSIVO DO CONSULTOR PARCEIRO
+@app.get("/consultor/dashboard", response_class=HTMLResponse)
+def portal_consultor():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nome, registro_classe, creditos_saldo FROM consultores LIMIT 1")
+    consultor = cursor.fetchone()
+    
+    cursor.execute("SELECT nome, codigo_car, status, criado_em FROM leads WHERE consultor_id = ? ORDER BY id DESC", (consultor[0],))
+    clientes = cursor.fetchall()
+    conn.close()
+
+    linhas_clientes = ""
+    for c in clientes:
+        cor_badge = "#2e7d32" if c[2] == "APTO" else "#b91c1c"
+        bg_badge = "#e8f5e9" if c[2] == "APTO" else "#fee2e2"
+        linhas_clientes += f"""
+        <tr>
+            <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:600;">{c[0]}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; font-family:monospace;">{c[1]}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd;"><span style="background:{bg_badge}; color:{cor_badge}; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{c[2]}</span></td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; font-size:12px; color:#666;">{c[3]}</td>
+        </tr>
+        """
+    if not clientes:
+        linhas_clientes = "<tr><td colspan='4' style='padding:15px; text-align:center; color:#888;'>Nenhum cliente auditado por este escritório ainda.</td></tr>"
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <title>HUSAI CARBON | Portal do Consultor Parceiro</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+            body {{ font-family: 'Inter', sans-serif; background: #f1f5f9; padding: 2rem; color: #1e293b; }}
+            .container {{ max-width: 950px; margin: 0 auto; }}
+            .header-parceiro {{ background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-left: 5px solid #2d6a4f; }}
+            .card-saldo {{ background: #1b4332; color: white; padding: 1rem 1.5rem; border-radius: 10px; text-align: right; }}
+            .card-saldo h2 {{ font-size: 1.8rem; margin: 0; color: #52b788; }}
+            .card-saldo p {{ margin: 0; font-size: 0.8rem; opacity: 0.9; }}
+            .bloco-conteudo {{ background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+            table {{ width: 100%; border-collapse: collapse; text-align: left; margin-top: 1rem; }}
+            th {{ background: #f8fafc; padding: 10px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }}
+            .btn-recarga {{ background: #0284c7; color: white; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-top: 0.5rem; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header-parceiro">
+                <div>
+                    <h1 style="color: #1b4332; font-size: 1.4rem; margin-bottom: 0.2rem;">{consultor[1]}</h1>
+                    <p style="color: #64748b; font-size: 0.85rem; margin: 0;">Registro Profissional: <b>{consultor[2]}</b> | Escritório Homologado Husai Carbon</p>
+                </div>
+                <div class="card-saldo">
+                    <p>SALDO DE CRÉDITOS</p>
+                    <h2>{consultor[3]} Laudos</h2>
+                    <a href="#" class="btn-recarga" onclick="alert('Recarga de pacotes via PIX: R$ 200,00 por laudo no pacote de 10 unidades.')">+ Comprar Créditos</a>
+                </div>
+            </div>
+
+            <div class="bloco-conteudo">
+                <h3 style="color: #1b4332; font-size: 1.1rem; margin-bottom: 0.4rem;">Carteira de Fazendas Auditadas</h3>
+                <p style="color: #64748b; font-size: 0.85rem; margin: 0;">Todas as emissões geradas através deste escritório saem com co-branding e registro do seu conselho de classe.</p>
+                
+                <table>
+                    <thead>
+                        <tr><th>Cliente / Propriedade</th><th>Código CAR</th><th>Status Conformidade</th><th>Data</th></tr>
+                    </thead>
+                    <tbody>
+                        {linhas_clientes}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </body>
     </html>
@@ -300,7 +383,6 @@ def exportar_csv(username: str = Depends(verificar_admin)):
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
     writer.writerow(["ID", "Nome / Razao", "E-mail", "WhatsApp", "Codigo CAR", "Metodo", "Status", "Data Cadastro"])
-
     for r in linhas:
         writer.writerow(r)
 
