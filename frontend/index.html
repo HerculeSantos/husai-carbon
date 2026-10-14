@@ -183,7 +183,7 @@
 <body>
     <header>
         <div class="logo">HUSAI <span>CARBON</span></div>
-        <div class="badge-gov">Ambiente Homologado | MT</div>
+        <div class="badge-gov">Plataforma Oficial | MT</div>
     </header>
 
     <div class="container">
@@ -195,12 +195,9 @@
         <div class="search-card">
             <label style="font-size: 0.82rem; font-weight: 700; color: #475569;">CÓDIGO OFICIAL DO CAR (SICAR-MT)</label>
             <div class="search-box">
-                <input type="text" id="carInput" value="MT-5104557-00982341">
+                <input type="text" id="carInput" placeholder="Ex: MT-5104557-XXXXXXXXXXXXXXXXXXXX">
                 <button type="button" class="btn-consultar" onclick="consultarCAR()">Auditar Imóvel</button>
             </div>
-            <small style="color:#64748b; font-size:0.75rem; display:block; margin-top:0.4rem;">
-                * Dica de homologação: digite <b>MT-EMBARGO-TESTE</b> para testar a rota de fazenda com pendência.
-            </small>
         </div>
 
         <!-- CENÁRIO A: APTO -->
@@ -304,6 +301,11 @@
             var car = document.getElementById('carInput').value.trim().toUpperCase();
             var boxApto = document.getElementById('previewBoxApto');
             var boxBloq = document.getElementById('previewBoxBloqueado');
+
+            if(!car) {
+                alert("Por favor, preencha o código do CAR antes de prosseguir.");
+                return;
+            }
 
             if(car.indexOf("EMBARGO") !== -1 || car.indexOf("BLOQ") !== -1) {
                 statusAtualConsulta = "BLOQUEADO_RESTRICAO";
