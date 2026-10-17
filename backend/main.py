@@ -6,6 +6,7 @@ import sqlite3
 import secrets
 import traceback
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -13,6 +14,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 import mercadopago
 
+from backend.gis_engine import verificar_sobreposicao
 from backend.modules.gerar_laudo import emitir_laudo_husai_completo
 
 load_dotenv()
@@ -37,6 +39,48 @@ def verificar_admin(credentials: HTTPBasicCredentials = Depends(security)):
     return credentials.username
 
 DB_PATH = "leads_husai.db"
+GIS_DATA_DIR = Path(__file__).resolve().parent.parent / "gis_data"
+CAR_SHAPEFILES_DIR = GIS_DATA_DIR / "shapefiles"
+EMBARGOS_GEOJSON = GIS_DATA_DIR / "processed" / "embargos.geojson"
+
+
+def verificar_status_car(codigo_car: str) -> tuple[str, int]:
+    codigo_car = codigo_car.strip()
+    if not codigo_car or Path(codigo_car).name != codigo_car:
+        raise HTTPException(status_code=400, detail="Código do CAR inválido.")
+
+    formatos_car = (".shp", ".geojson", ".gpkg", ".json")
+    arquivos_car = [
+        CAR_SHAPEFILES_DIR / f"{codigo_car}{formato}"
+        for formato in formatos_car
+        if (CAR_SHAPEFILES_DIR / f"{codigo_car}{formato}").is_file()
+    ]
+    if not arquivos_car:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Não foram encontrados dados geográficos para o CAR {codigo_car}.",
+        )
+    if len(arquivos_car) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Há mais de um arquivo geográfico para o CAR {codigo_car}.",
+        )
+    if not EMBARGOS_GEOJSON.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Arquivo de embargos não encontrado: {EMBARGOS_GEOJSON}",
+        )
+
+    try:
+        sobreposicoes = verificar_sobreposicao(arquivos_car[0], EMBARGOS_GEOJSON)
+    except ValueError as erro:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Não foi possível validar os dados geográficos: {erro}",
+        ) from erro
+
+    quantidade = len(sobreposicoes)
+    return ("RESTRICAO" if quantidade else "APTO", quantidade)
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -86,7 +130,6 @@ class LeadModel(BaseModel):
     whatsapp: str
     codigo_car: str
     metodo: str
-    status: str = "APTO"
     consultor_id: int = None
 
 class PixRequestModel(BaseModel):
@@ -170,16 +213,36 @@ def criar_pix(dados: PixRequestModel):
 
 @app.post("/api/salvar-lead")
 def salvar_lead(lead: LeadModel):
+    status_car, _ = verificar_status_car(lead.codigo_car)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("""
         INSERT INTO leads (nome, email, whatsapp, codigo_car, metodo, status, consultor_id, criado_em)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (lead.nome, lead.email, lead.whatsapp, lead.codigo_car, lead.metodo, lead.status, lead.consultor_id, data_hora))
+    """, (lead.nome, lead.email, lead.whatsapp, lead.codigo_car, lead.metodo, status_car, lead.consultor_id, data_hora))
     conn.commit()
     conn.close()
-    return {"status": "sucesso", "mensagem": "Lead registrada com sucesso"}
+    return {
+        "status": "sucesso",
+        "mensagem": "Lead registrada com sucesso",
+        "status_imovel": status_car,
+    }
+
+
+@app.get("/api/auditar")
+def auditar_car(codigo_car: str = Query(...)):
+    status_car, quantidade_embargos = verificar_status_car(codigo_car)
+    return {
+        "codigo_car": codigo_car,
+        "status": status_car,
+        "quantidade_embargos": quantidade_embargos,
+    }
+
+
+@app.get("/api/consultar-car/{codigo_car}")
+def consultar_car(codigo_car: str):
+    return auditar_car(codigo_car)
 
 @app.get("/api/download-laudo")
 def download_laudo(

@@ -217,7 +217,7 @@
                     <div class="stat-item"><small>ÁREA PRESERVADA</small><strong>875,00 ha</strong></div>
                     <div class="stat-item"><small>ESTOQUE ESTIMADO</small><strong>1.750 tCO2e/ano</strong></div>
                 </div>
-                <button type="button" class="btn-desbloquear" onclick="abrirModal('APTO')">
+                <button type="button" class="btn-desbloquear" onclick="abrirModal()">
                     🔒 Desbloquear Dossiê Técnico Completo (PDF)
                 </button>
             </div>
@@ -235,7 +235,7 @@
                     <p>Detectamos uma restrição ambiental administrativa no cadastro do imóvel. A valoração econômica para CPR Verde fica suspensa até a conclusão da regularização.</p>
                     <p><b>Solução:</b> A elaboração de um <b>Plano de Recuperação (PRADA)</b> ou defesa técnica restabelece a conformidade jurídica da propriedade.</p>
                 </div>
-                <button type="button" class="btn-regularizar" onclick="abrirModal('BLOQUEADO_RESTRICAO')">
+                <button type="button" class="btn-regularizar" onclick="abrirModal()">
                     📑 Baixar Diagnóstico de Restrição & Acionar Consultor
                 </button>
             </div>
@@ -295,39 +295,55 @@
     </div>
 
     <script>
-        var statusAtualConsulta = "APTO";
+        var statusAtualConsulta = "";
 
-        function consultarCAR() {
+        async function consultarCAR() {
             var car = document.getElementById('carInput').value.trim().toUpperCase();
             var boxApto = document.getElementById('previewBoxApto');
             var boxBloq = document.getElementById('previewBoxBloqueado');
+            var btnConsultar = document.querySelector('.btn-consultar');
 
             if(!car) {
                 alert("Por favor, preencha o código do CAR antes de prosseguir.");
                 return;
             }
 
-            if(car.indexOf("EMBARGO") !== -1 || car.indexOf("BLOQ") !== -1) {
-                statusAtualConsulta = "BLOQUEADO_RESTRICAO";
-                boxApto.style.display = 'none';
-                boxBloq.style.display = 'block';
-                boxBloq.scrollIntoView({ behavior: 'smooth' });
-            } else {
-                statusAtualConsulta = "APTO";
-                boxBloq.style.display = 'none';
-                boxApto.style.display = 'block';
-                boxApto.scrollIntoView({ behavior: 'smooth' });
+            btnConsultar.disabled = true;
+            btnConsultar.innerText = "⏳ Consultando...";
+            boxApto.style.display = 'none';
+            boxBloq.style.display = 'none';
+
+            try {
+                var response = await fetch("/api/auditar?codigo_car=" + encodeURIComponent(car));
+                var data = await response.json();
+                if(!response.ok) {
+                    throw new Error(data.detail || "Não foi possível validar o CAR.");
+                }
+
+                statusAtualConsulta = data.status;
+                if(statusAtualConsulta === "RESTRICAO") {
+                    boxBloq.style.display = 'block';
+                    boxBloq.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    boxApto.style.display = 'block';
+                    boxApto.scrollIntoView({ behavior: 'smooth' });
+                }
+            } catch(e) {
+                statusAtualConsulta = "";
+                alert(e.message || "Erro ao consultar o CAR.");
+            } finally {
+                btnConsultar.disabled = false;
+                btnConsultar.innerText = "Auditar Imóvel";
             }
         }
 
-        function abrirModal(tipoStatus) {
-            statusAtualConsulta = tipoStatus || "APTO";
+        function abrirModal() {
             var modal = document.getElementById('modalCheckout');
             var modalTitulo = document.getElementById('modalTitulo');
             var modalDesc = document.getElementById('modalDesc');
             var btnPix = document.getElementById('btnDispararPix');
 
-            if(statusAtualConsulta === "BLOQUEADO_RESTRICAO") {
+            if(statusAtualConsulta === "RESTRICAO") {
                 modalTitulo.innerText = "Diagnóstico Técnico de Restrição";
                 modalTitulo.style.color = "#991b1b";
                 modalDesc.innerText = "Preencha seus dados para receber o parecer do embargo e acionar o consultor especialista.";
@@ -443,7 +459,6 @@
                         whatsapp: whats,
                         codigo_car: car,
                         metodo: tipoMetodo,
-                        status: statusAtualConsulta,
                         consultor_id: 1
                     })
                 });
@@ -458,7 +473,7 @@
             
             window.location.href = urlDownload;
 
-            if(statusAtualConsulta === "BLOQUEADO_RESTRICAO") {
+            if(statusAtualConsulta === "RESTRICAO") {
                 setTimeout(function() {
                     var textoWhats = "Olá, acabei de emitir o Parecer de Restrição do imóvel CAR " + car + " na Husai Carbon e preciso de suporte com a consultoria para desembaraço e regularização ambiental.";
                     var urlWhats = "https://wa.me/5566996543210?text=" + encodeURIComponent(textoWhats);
