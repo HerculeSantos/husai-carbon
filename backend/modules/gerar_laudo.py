@@ -1,27 +1,49 @@
 import os
 import hashlib
+import re
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.graphics.shapes import Drawing, Rect
 from reportlab.lib.units import mm
 import qrcode
 
+def _formatar_coordenadas(coordenadas):
+    coordenadas_match = re.match(
+        r"^\s*([+-]?\d+(?:\.\d+)?)\s*,?\s*([+-]?\d+(?:\.\d+)?)",
+        coordenadas
+    )
+    if coordenadas_match:
+        latitude, longitude = coordenadas_match.groups()
+        return f"{latitude}, {longitude}"
+    return coordenadas.strip()
+
+
 def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, caminho_saida_pdf: str, status_conformidade: str = "APTO"):
+    rodape = {}
+
+    def desenhar_rodape(canvas, documento):
+        tabela_rodape = rodape.get("tabela")
+        if tabela_rodape is None or documento.page != 1:
+            return
+
+        tabela_rodape.wrap(documento.width, documento.bottomMargin)
+        tabela_rodape.drawOn(canvas, documento.leftMargin, 7 * mm)
+
     doc = SimpleDocTemplate(
         caminho_saida_pdf,
         pagesize=A4,
-        leftMargin=12 * mm,
-        rightMargin=12 * mm,
-        topMargin=10 * mm,
-        bottomMargin=10 * mm
+        leftMargin=9 * mm,
+        rightMargin=9 * mm,
+        topMargin=8 * mm,
+        bottomMargin=36 * mm
     )
 
-    largura_util = 186 * mm
+    largura_util = A4[0] - doc.leftMargin - doc.rightMargin
+    espacamento_secao = 12 * mm
     styles = getSampleStyleSheet()
 
     # Definição de Paleta de Cores
@@ -121,6 +143,7 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
     img_qr.save(temp_qr_path)
 
     elementos = []
+    espacadores_distribuicao = []
 
     # Cabeçalho Institucional
     nome_consultor = dados_consultor.get("nome", "Husai Carbon Soluções Ambientais")
@@ -133,23 +156,24 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         Paragraph(f"Responsável Técnico: <b>{nome_consultor}</b> ({reg_consultor})", style_subtitulo),
     ]
 
-    from reportlab.platypus import Image as RLImage
-    qr_img = RLImage(temp_qr_path, width=18 * mm, height=18 * mm)
-
-    tabela_cabecalho = Table(
-        [[topo_esquerda, qr_img]],
-        colWidths=[largura_util - (22 * mm), 22 * mm]
-    )
+    tabela_cabecalho = Table([[topo_esquerda]], colWidths=[largura_util])
     tabela_cabecalho.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('LINEBELOW', (0,0), (-1,-1), 0.75, COR_BORDA),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
         ('RIGHTPADDING', (0,0), (-1,-1), 0),
         ('TOPPADDING', (0,0), (-1,-1), 0),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
     ]))
     elementos.append(tabela_cabecalho)
-    elementos.append(Spacer(1, 2.5 * mm))
+    espacador_cabecalho = Spacer(1, 8 * mm)
+    elementos.append(espacador_cabecalho)
+    espacadores_distribuicao.append(espacador_cabecalho)
+
+    def adicionar_espacamento_secao():
+        espacador = Spacer(1, espacamento_secao)
+        elementos.append(espacador)
+        espacadores_distribuicao.append(espacador)
 
     def criar_barra_secao(titulo_secao):
         t = Table([[Paragraph(titulo_secao.upper(), style_secao)]], colWidths=[largura_util])
@@ -164,23 +188,27 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
 
     # 1. IDENTIFICAÇÃO DO IMÓVEL
     elementos.append(criar_barra_secao("1. Identificação do Titular e do Imóvel (SICAR-MT)"))
+    coordenadas = _formatar_coordenadas(
+        str(dados_imovel.get("coordenadas_ref") or "-12.5641, -55.7215")
+    )
+
     t_id = Table([
         [Paragraph("Titular / Razão Social:", style_item_label), Paragraph(dados_imovel.get("proprietario", "-"), style_val_negrito),
          Paragraph("E-mail de Notificação:", style_item_label), Paragraph(dados_imovel.get("contato", "-"), style_item_val)],
         [Paragraph("Registo CAR (SICAR-MT):", style_item_label), Paragraph(car_ref, style_val_negrito),
-         Paragraph("Coordenadas Geográficas:", style_item_label), Paragraph(dados_imovel.get("coordenadas_ref", "-12.5641, -55.7215"), style_item_val)]
-    ], colWidths=[38 * mm, 55 * mm, 38 * mm, 55 * mm])
+         Paragraph("Coordenadas Geográficas:", style_item_label), Paragraph(coordenadas, style_item_val)]
+    ], colWidths=[39 * mm, 56 * mm, 39 * mm, largura_util - (134 * mm)])
     t_id.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), COR_FUNDO_CARD),
         ('BOX', (0,0), (-1,-1), 0.5, COR_BORDA),
         ('INNERGRID', (0,0), (-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-        ('TOPPADDING', (0,0), (-1,-1), 2.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
     ]))
     elementos.append(t_id)
-    elementos.append(Spacer(1, 2 * mm))
+    adicionar_espacamento_secao()
 
     # 2. ZONEAMENTO DE COBERTURA
     elementos.append(criar_barra_secao("2. Zoneamento e Estrutura de Uso do Solo"))
@@ -191,18 +219,18 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         [Paragraph("Reserva Legal Obrigatória (RL)", style_item_val), Paragraph(f"{dados_imovel.get('reserva_legal_ha', 750):,.2f} ha", style_item_val), Paragraph("30.0%", style_item_val)],
         [Paragraph("Área de Preservação Permanente (APP)", style_item_val), Paragraph(f"{dados_imovel.get('app_ha', 125):,.2f} ha", style_item_val), Paragraph("5.0%", style_item_val)],
         [Paragraph("Excedente Florestal Preservado Elegível", style_val_negrito), Paragraph(f"{dados_imovel.get('excedente_ha', 125):,.2f} ha", style_val_negrito), Paragraph("5.0%", style_val_negrito)],
-    ], colWidths=[106 * mm, 45 * mm, 35 * mm])
+    ], colWidths=[108 * mm, 46 * mm, largura_util - (154 * mm)])
     t_zone.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f1f5f9")),
         ('BOX', (0,0), (-1,-1), 0.5, COR_BORDA),
         ('INNERGRID', (0,0), (-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-        ('TOPPADDING', (0,0), (-1,-1), 1.8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
     ]))
     elementos.append(t_zone)
-    elementos.append(Spacer(1, 2 * mm))
+    adicionar_espacamento_secao()
 
     # 3. VERIFICAÇÃO DE RISCO SOCIOAMBIENTAL
     elementos.append(criar_barra_secao("3. Verificação de Risco Socioambiental & Sobreposição Oficial"))
@@ -220,18 +248,18 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         [Paragraph("Embargos Ambientais SEMA-MT", style_item_val), status_sema, Paragraph("GeoSema / SIMCAR Mato Grosso", style_item_val)],
         [Paragraph("Intersecção com Terras Indígenas", style_item_val), Paragraph("<font color='#16a34a'><b>0.00% (Sem Sobreposição)</b></font>", style_item_val), Paragraph("Bases Geoespaciais FUNAI", style_item_val)],
         [Paragraph("Unidades de Conservação Proteção Integral", style_item_val), Paragraph("<font color='#16a34a'><b>0.00% (Sem Sobreposição)</b></font>", style_item_val), Paragraph("CNUC / ICMBio / MMA", style_item_val)],
-    ], colWidths=[80 * mm, 56 * mm, 50 * mm])
+    ], colWidths=[82 * mm, 56 * mm, largura_util - (138 * mm)])
     t_risco.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f1f5f9")),
         ('BOX', (0,0), (-1,-1), 0.5, COR_BORDA),
         ('INNERGRID', (0,0), (-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-        ('TOPPADDING', (0,0), (-1,-1), 1.8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.8),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
     ]))
     elementos.append(t_risco)
-    elementos.append(Spacer(1, 2 * mm))
+    adicionar_espacamento_secao()
 
     # 4. CONDICIONAL: VALORAÇÃO OU PARECER DE DESEMBARAÇO
     if status_conformidade == "APTO":
@@ -257,13 +285,12 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
     t_val.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), COR_DESTAQUE),
         ('BOX', (0,0), (-1,-1), 1, COR_SECUNDARIA),
-        ('TOPPADDING', (0,0), (-1,-1), 3),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
         ('LEFTPADDING', (0,0), (-1,-1), 5),
         ('RIGHTPADDING', (0,0), (-1,-1), 5),
     ]))
     elementos.append(t_val)
-    elementos.append(Spacer(1, 2 * mm))
 
     # 5. ASSINATURA DIGITAL E AUDITORIA
     bloco_assinatura = [
@@ -272,18 +299,38 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         Paragraph(f"<b>ASSINATURA DIGITAL (SHA-256):</b><br/>{assinatura_sha256}", ParagraphStyle('HashSha', parent=style_item_label, fontSize=6.5, leading=8, textColor=COR_TEXTO)),
         Paragraph("Garantia Anti-Double Counting: Registro processado em índice espacial exclusivo. Aponte a câmera para o QR Code para validar este documento na íntegra.", style_subtitulo)
     ]
-    t_ass = Table([[bloco_assinatura]], colWidths=[largura_util])
-    t_ass.setStyle(TableStyle([
+    from reportlab.platypus import Image as RLImage
+    qr_img = RLImage(temp_qr_path, width=18 * mm, height=18 * mm)
+    tabela_rodape = Table(
+        [[bloco_assinatura, qr_img]],
+        colWidths=[largura_util - (22 * mm), 22 * mm]
+    )
+    tabela_rodape.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
-        ('BOX', (0,0), (-1,-1), 0.5, COR_BORDA),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('BOX', (0,0), (-1,-1), 0.75, COR_BORDA),
+        ('LINEABOVE', (0,0), (-1,0), 1, COR_SECUNDARIA),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,0), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
     ]))
-    elementos.append(t_ass)
+    rodape["tabela"] = tabela_rodape
 
-    doc.build(elementos)
+    altura_conteudo = sum(
+        elemento.wrap(doc.width, doc.height)[1]
+        for elemento in elementos
+    )
+    altura_alvo = doc.height - (5 * mm)
+    altura_livre = max(0, altura_alvo - altura_conteudo)
+    if espacadores_distribuicao:
+        # Distribui a altura que sobraria em branco pelos intervalos entre secções.
+        incremento = altura_livre / len(espacadores_distribuicao)
+        for espacador in espacadores_distribuicao:
+            espacador.height += incremento
+
+    doc.build(elementos, onFirstPage=desenhar_rodape, onLaterPages=desenhar_rodape)
 
     if os.path.exists(temp_qr_path):
         os.remove(temp_qr_path)
