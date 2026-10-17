@@ -15,12 +15,13 @@ from reportlab.platypus import (
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 import qrcode
 
 
 def _formatar_coordenadas(coordenadas):
     coordenadas_match = re.match(
-        r"^\s*\(?\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*"
+        r"^\s*\(?\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,?\s*"
         r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))",
         coordenadas
     )
@@ -94,6 +95,7 @@ def _gerar_mapa_car(codigo_car):
             pad_inches=0.08,
             facecolor="white",
         )
+        buffer_mapa.seek(0)
     except Exception:
         buffer_mapa.close()
         raise
@@ -105,6 +107,33 @@ def _gerar_mapa_car(codigo_car):
 
 def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, caminho_saida_pdf: str, status_conformidade: str = "APTO"):
     rodape = {}
+
+    def desenhar_pagina_mapa(canvas, documento):
+        if documento.page != 2:
+            return
+
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor("#1b4332"))
+        canvas.setFont("Helvetica-Bold", 13)
+        canvas.drawCentredString(
+            A4[0] / 2,
+            A4[1] - 15 * mm,
+            "ANEXO I - MAPA GEOESPACIAL DA ÁREA AUDITADA",
+        )
+
+        margem_mapa = 12 * mm
+        topo_mapa = A4[1] - 25 * mm
+        canvas.drawImage(
+            ImageReader(buffer_mapa),
+            margem_mapa,
+            margem_mapa,
+            width=A4[0] - (2 * margem_mapa),
+            height=topo_mapa - margem_mapa,
+            preserveAspectRatio=True,
+            anchor="c",
+            mask="auto",
+        )
+        canvas.restoreState()
 
     def desenhar_rodape(canvas, documento):
         tabela_rodape = rodape.get("tabela")
@@ -411,39 +440,17 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         for espacador in espacadores_distribuicao:
             espacador.height += incremento
 
-    estilo_titulo_mapa = ParagraphStyle(
-        "TituloMapaGeoespacial",
-        parent=style_titulo,
-        alignment=1,
-        textColor=colors.HexColor("#1b4332"),
-    )
-    largura_mapa = largura_util
-    altura_mapa = doc.height - (22 * mm)
-    imagem_mapa = Image(
-        buffer_mapa,
-        width=largura_mapa,
-        height=altura_mapa,
-        kind="proportional",
-        hAlign="CENTER",
-    )
-    area_imagem_mapa = Table([[imagem_mapa]], colWidths=[largura_mapa], rowHeights=[altura_mapa])
-    area_imagem_mapa.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
     elementos.extend([
         PageBreak(),
-        Paragraph("ANEXO I - MAPA GEOESPACIAL DA ÁREA AUDITADA", estilo_titulo_mapa),
-        Spacer(1, 5 * mm),
-        area_imagem_mapa,
+        Spacer(1, 1),
     ])
 
     try:
-        doc.build(elementos, onFirstPage=desenhar_rodape, onLaterPages=desenhar_rodape)
+        doc.build(
+            elementos,
+            onFirstPage=desenhar_rodape,
+            onLaterPages=desenhar_pagina_mapa,
+        )
     finally:
         buffer_mapa.close()
         if os.path.exists(temp_qr_path):
