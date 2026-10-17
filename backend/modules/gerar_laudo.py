@@ -16,6 +16,7 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen.canvas import Canvas
 import qrcode
 
 
@@ -107,33 +108,6 @@ def _gerar_mapa_car(codigo_car):
 
 def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, caminho_saida_pdf: str, status_conformidade: str = "APTO"):
     rodape = {}
-
-    def desenhar_pagina_mapa(canvas, documento):
-        if documento.page != 2:
-            return
-
-        canvas.saveState()
-        canvas.setFillColor(colors.HexColor("#1b4332"))
-        canvas.setFont("Helvetica-Bold", 13)
-        canvas.drawCentredString(
-            A4[0] / 2,
-            A4[1] - 15 * mm,
-            "ANEXO I - MAPA GEOESPACIAL DA ÁREA AUDITADA",
-        )
-
-        margem_mapa = 12 * mm
-        topo_mapa = A4[1] - 25 * mm
-        canvas.drawImage(
-            ImageReader(buffer_mapa),
-            margem_mapa,
-            margem_mapa,
-            width=A4[0] - (2 * margem_mapa),
-            height=topo_mapa - margem_mapa,
-            preserveAspectRatio=True,
-            anchor="c",
-            mask="auto",
-        )
-        canvas.restoreState()
 
     def desenhar_rodape(canvas, documento):
         tabela_rodape = rodape.get("tabela")
@@ -241,6 +215,35 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
     timestamp_utc = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     car_ref = dados_imovel.get("codigo_car", "MT-5104557-00982341")
     buffer_mapa = _gerar_mapa_car(car_ref)
+
+    class CanvasComMapa(Canvas):
+        def showPage(self):
+            pagina_atual = self._pageNumber
+            super().showPage()
+
+            if pagina_atual == 1:
+                self.saveState()
+                self.setFont("Helvetica-Bold", 14)
+                self.setFillColorRGB(0, 0.4, 0)
+                self.drawString(
+                    50,
+                    800,
+                    "ANEXO I - MAPA GEOESPACIAL DA ÁREA AUDITADA",
+                )
+                buffer_mapa.seek(0)
+                mapa_img = ImageReader(buffer_mapa)
+                self.drawImage(
+                    mapa_img,
+                    50,
+                    350,
+                    width=500,
+                    height=400,
+                    preserveAspectRatio=True,
+                    anchor="c",
+                    mask="auto",
+                )
+                self.restoreState()
+
     hash_base = f"{car_ref}|{timestamp_utc}|{status_conformidade}|HUSAI_CARBON_v2.0"
     assinatura_sha256 = hashlib.sha256(hash_base.encode('utf-8')).hexdigest().upper()
     codigo_custodia = f"HC-MT-{assinatura_sha256[:10]}"
@@ -449,7 +452,7 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         doc.build(
             elementos,
             onFirstPage=desenhar_rodape,
-            onLaterPages=desenhar_pagina_mapa,
+            canvasmaker=CanvasComMapa,
         )
     finally:
         buffer_mapa.close()
