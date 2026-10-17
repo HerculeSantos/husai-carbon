@@ -1,26 +1,107 @@
 import os
 import hashlib
 import re
+from io import BytesIO
+from pathlib import Path
 from datetime import datetime
+import geopandas as gpd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 import qrcode
 
+
 def _formatar_coordenadas(coordenadas):
     coordenadas_match = re.match(
-        r"^\s*([+-]?\d+(?:\.\d+)?)\s*,?\s*([+-]?\d+(?:\.\d+)?)",
+        r"^\s*\(?\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*"
+        r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))",
         coordenadas
     )
     if coordenadas_match:
         latitude, longitude = coordenadas_match.groups()
         return f"{latitude}, {longitude}"
-    return coordenadas.strip()
+    return coordenadas.strip().rstrip(",").strip()
 
+
+def _gerar_mapa_car(codigo_car):
+    if Path(codigo_car).name != codigo_car:
+        raise ValueError(f"Código CAR inválido para gerar o mapa: {codigo_car}")
+
+    pasta_car = Path(__file__).resolve().parents[2] / "gis_data" / "shapefiles"
+    caminhos_car = [
+        pasta_car / f"{codigo_car}{extensao}"
+        for extensao in (".shp", ".geojson", ".gpkg", ".json")
+    ]
+    arquivos_car = [caminho for caminho in caminhos_car if caminho.is_file()]
+    if not arquivos_car:
+        raise FileNotFoundError(
+            f"Não foram encontrados dados geográficos para o CAR {codigo_car} "
+            f"em {pasta_car}."
+        )
+    if len(arquivos_car) > 1:
+        raise ValueError(
+            f"Há mais de um arquivo geográfico para o CAR {codigo_car}: "
+            f"{', '.join(str(caminho) for caminho in arquivos_car)}"
+        )
+
+    car = gpd.read_file(arquivos_car[0])
+    if car.empty or car.geometry.isna().all():
+        raise ValueError(f"O CAR {codigo_car} não contém geometrias.")
+    if car.crs is None:
+        raise ValueError(f"O arquivo geográfico do CAR {codigo_car} não informa o CRS.")
+
+    geometrias = car.geometry.dropna()
+    geometrias = geometrias[~geometrias.is_empty]
+    if geometrias.empty:
+        raise ValueError(f"O CAR {codigo_car} não contém geometrias válidas.")
+    if not geometrias.geom_type.isin(["Polygon", "MultiPolygon"]).all():
+        raise ValueError(f"O CAR {codigo_car} deve conter apenas polígonos.")
+
+    crs_utm = car.estimate_utm_crs()
+    if crs_utm is None:
+        raise ValueError(f"Não foi possível determinar uma projeção UTM para o CAR {codigo_car}.")
+
+    geometria = gpd.GeoSeries(geometrias, crs=car.crs).to_crs(crs_utm).union_all()
+    min_x, min_y, max_x, max_y = geometria.bounds
+    tolerancia = max(max_x - min_x, max_y - min_y) * 0.001
+    geometria = geometria.simplify(tolerancia, preserve_topology=True)
+    if geometria.is_empty:
+        raise ValueError(f"A geometria simplificada do CAR {codigo_car} está vazia.")
+
+    buffer_mapa = BytesIO()
+    figura, eixo = plt.subplots(figsize=(7.5, 9), dpi=300)
+    try:
+        gpd.GeoSeries([geometria], crs=crs_utm).plot(
+            ax=eixo,
+            facecolor="#d8f3dc",
+            edgecolor="#1b4332",
+            linewidth=1.1,
+        )
+        eixo.axis("off")
+        figura.subplots_adjust(left=0.02, right=0.98, top=0.98, bottom=0.02)
+        figura.savefig(
+            buffer_mapa,
+            format="png",
+            dpi=300,
+            bbox_inches="tight",
+            pad_inches=0.08,
+            facecolor="white",
+        )
+    except Exception:
+        buffer_mapa.close()
+        raise
+    finally:
+        plt.close(figura)
+
+    buffer_mapa.seek(0)
+    return buffer_mapa
 
 def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, caminho_saida_pdf: str, status_conformidade: str = "APTO"):
     rodape = {}
@@ -130,6 +211,7 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
 
     timestamp_utc = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     car_ref = dados_imovel.get("codigo_car", "MT-5104557-00982341")
+    buffer_mapa = _gerar_mapa_car(car_ref)
     hash_base = f"{car_ref}|{timestamp_utc}|{status_conformidade}|HUSAI_CARBON_v2.0"
     assinatura_sha256 = hashlib.sha256(hash_base.encode('utf-8')).hexdigest().upper()
     codigo_custodia = f"HC-MT-{assinatura_sha256[:10]}"
@@ -299,8 +381,7 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         Paragraph(f"<b>ASSINATURA DIGITAL (SHA-256):</b><br/>{assinatura_sha256}", ParagraphStyle('HashSha', parent=style_item_label, fontSize=6.5, leading=8, textColor=COR_TEXTO)),
         Paragraph("Garantia Anti-Double Counting: Registro processado em índice espacial exclusivo. Aponte a câmera para o QR Code para validar este documento na íntegra.", style_subtitulo)
     ]
-    from reportlab.platypus import Image as RLImage
-    qr_img = RLImage(temp_qr_path, width=18 * mm, height=18 * mm)
+    qr_img = Image(temp_qr_path, width=18 * mm, height=18 * mm)
     tabela_rodape = Table(
         [[bloco_assinatura, qr_img]],
         colWidths=[largura_util - (22 * mm), 22 * mm]
@@ -330,9 +411,42 @@ def emitir_laudo_husai_completo(dados_imovel: dict, dados_consultor: dict, camin
         for espacador in espacadores_distribuicao:
             espacador.height += incremento
 
-    doc.build(elementos, onFirstPage=desenhar_rodape, onLaterPages=desenhar_rodape)
+    estilo_titulo_mapa = ParagraphStyle(
+        "TituloMapaGeoespacial",
+        parent=style_titulo,
+        alignment=1,
+        textColor=colors.HexColor("#1b4332"),
+    )
+    largura_mapa = largura_util
+    altura_mapa = doc.height - (22 * mm)
+    imagem_mapa = Image(
+        buffer_mapa,
+        width=largura_mapa,
+        height=altura_mapa,
+        kind="proportional",
+        hAlign="CENTER",
+    )
+    area_imagem_mapa = Table([[imagem_mapa]], colWidths=[largura_mapa], rowHeights=[altura_mapa])
+    area_imagem_mapa.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    elementos.extend([
+        PageBreak(),
+        Paragraph("ANEXO I - MAPA GEOESPACIAL DA ÁREA AUDITADA", estilo_titulo_mapa),
+        Spacer(1, 5 * mm),
+        area_imagem_mapa,
+    ])
 
-    if os.path.exists(temp_qr_path):
-        os.remove(temp_qr_path)
+    try:
+        doc.build(elementos, onFirstPage=desenhar_rodape, onLaterPages=desenhar_rodape)
+    finally:
+        buffer_mapa.close()
+        if os.path.exists(temp_qr_path):
+            os.remove(temp_qr_path)
 
     return True
