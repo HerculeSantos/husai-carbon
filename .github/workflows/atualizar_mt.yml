@@ -1,0 +1,46 @@
+name: Atualizar embargos de Mato Grosso
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-embargos-mt
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    env:
+      MT_EMBARGOS_GEOJSON_URL: ${{ vars.MT_EMBARGOS_GEOJSON_URL }}
+      MT_LIMITE_GEOJSON_URL: ${{ vars.MT_LIMITE_GEOJSON_URL }}
+    steps:
+      - name: Obter o repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências geoespaciais
+        run: python -m pip install --disable-pip-version-check geopandas
+
+      - name: Descarregar e filtrar os embargos de MT
+        run: python backend/atualizar_embargos_mt.py
+
+      - name: Guardar GeoJSON atualizado
+        run: |
+          git add gis_data/processed/embargos.geojson
+          if git diff --cached --quiet; then
+            echo "Os dados de embargos de MT não tiveram alterações."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Atualiza dados de embargos de Mato Grosso"
+          git push
